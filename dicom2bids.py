@@ -16,16 +16,6 @@ import shutil
 
 from pydicom import dcmread
 
-
-
-BIDS_FILENAMES= {
-        'MPRAGE': "_MPRAGE",
-        'FLAIR': "_FLAIR",
-        '3D EPI': "_acq-mag_T2star", # vs Swiss Epi?
-        'phase': "_acq-phase_T2star",
-        'Opt_DTI': "_DWI",
-    }
-
 def rename(series, filenames, path):
     if 'MPRAGE' in series:
         return ["MPRAGE"]
@@ -78,6 +68,7 @@ def convert_all_dicoms(directory, dicom2niix_path="dcm2niix", convert=True):
 
     """
     directory = os.path.join(directory)
+    print("[INFO] Starting to convert ...")
     if os.path.isfile(f"{directory}/DICOMDIR"):
 
 
@@ -271,6 +262,37 @@ def delete_nii_json_in_dicomdir(dicom_series):
                 os.remove(os.path.join(path, file))
 
 
+def rename_subject(bids_dir, old_id, new_id):
+    if os.path.exists(os.path.join(bids_dir, f'sub-{new_id}')):
+        raise FileExistsError(f"Subject {new_id} already exists in the database. Delete the subject first or choose another subject id.")
+    if not os.path.exists(os.path.join(bids_dir, f'sub-{old_id}')):
+        raise FileNotFoundError(f"Subject {old_id} is not in the database.")
+
+    subject_dir = os.path.join(bids_dir, f"sub-{old_id}")
+
+
+    def rename(main_dir):
+        for path, subdirs, files in os.walk(main_dir):
+            for filename in files:
+                 if filename.startswith(f'sub-{old_id}'):
+                    shutil.move(os.path.join(path, filename), \
+                              os.path.join(path, filename.replace(f"sub-{old_id}", f"sub-{new_id}")))
+
+    rename(subject_dir)
+    shutil.move(subject_dir, os.path.join(bids_dir, f"sub-{new_id}"))
+
+    derivatives = os.path.join(bids_dir, "derivatives")
+    all_directories = [x for x in next(os.walk(derivatives))[1]]
+
+    for derivative in all_directories:
+        der_dir = os.path.join(derivatives, derivative, f'sub-{old_id}')
+        rename(der_dir)
+        shutil.move(der_dir, os.path.join(derivatives, derivative, f"sub-{new_id}"))
+
+
+
+
+
 if __name__ == '__main__':
     pass
     directory = "D:/WSBIM/ROSE"
@@ -279,8 +301,8 @@ if __name__ == '__main__':
 
 
 
-    dicom_series = convert_all_dicoms(directory, dicom2niix_path)
-    pat_id, session = make_directories(bids_dir)
-    rename_and_move_nifti(dicom_series, bids_dir, pat_id, session)
+    # dicom_series = convert_all_dicoms(directory, dicom2niix_path)
+    # pat_id, session = make_directories(bids_dir)
+    # rename_and_move_nifti(dicom_series, bids_dir, pat_id, session)
 
 
