@@ -17,20 +17,24 @@ import shutil
 from pydicom import dcmread
 
 def rename(series, filenames, path):
-    if 'MPRAGE' in series:
+    if 'MPRAGE' in series or '3DT1' in series:
         return ["MPRAGE"]
-    if 'FLAIR' in series: # ORIG ???
+    if 'FLAIR' in series.upper(): # ORIG ???
         return ["FLAIR"]
-    if 'phase' in series:
+    if 'phase' in series or ("SWI_EPI" in series and "_ph" in series):
         return ["acq-phase_T2star"]
-    if '3D EPI' in series:
+    if '3D EPI' in series or "SWI_EPI" in series:
         return ["acq-mag_T2star"]
-    if 'Opt_DTI' in series:
+    if 'Opt_DTI' in series or 'DWI' in series:
         return ["DWI"]
     if "T1map" in series:
         return ["T1map"]
     if "DIR" in series:
         return ['DIR']
+    if "T2opt" in series:
+        return ['T2']
+    if "T1W" in series and "gd" in series:
+        return ['T1w_Gd']
     if "MP2RAGE" in series:
         if len(filenames)>1:
             new_filenames = []
@@ -69,49 +73,50 @@ def convert_all_dicoms(directory, dicom2niix_path="dcm2niix", convert=True):
     """
     directory = os.path.join(directory)
     print("[INFO] Starting to convert ...")
-    if os.path.isfile(f"{directory}/DICOMDIR"):
+    # if os.path.isfile(f"{directory}/DICOMDIR"):
 
 
-        ds = dcmread(f"{directory}/DICOMDIR")
+        # ds = dcmread(f"{directory}/DICOMDIR")
 
 
-        warnings.filterwarnings("ignore")
+        # warnings.filterwarnings("ignore")
 
-        [patient] = ds.patient_records
-        [study] = [ ii for ii in patient.children if ii.DirectoryRecordType == "STUDY" ]
-        all_series = [ii for ii in study.children if ii.DirectoryRecordType == "SERIES"]
+        # [patient] = ds.patient_records
+        # [study] = [ ii for ii in patient.children if ii.DirectoryRecordType == "STUDY" ]
+        # all_series = [ii for ii in study.children if ii.DirectoryRecordType == "SERIES"]
 
-        all_sequences=[]
+        # all_sequences=[]
 
-        for series in all_series:
-            # Find all the IMAGE records in the series
-            images = [
-                ii for ii in series.children
-                if ii.DirectoryRecordType == "IMAGE"
-            ]
+        # for series in all_series:
+        #     # Find all the IMAGE records in the series
+        #     images = [
+        #         ii for ii in series.children
+        #         if ii.DirectoryRecordType == "IMAGE"
+        #     ]
 
-            descr = getattr(
-                series, "SeriesDescription", "(no value available)"
-            )
+        #     descr = getattr(
+        #         series, "SeriesDescription", "(no value available)"
+        #     )
 
-            elems = [ii["ReferencedFileID"] for ii in images]
+        #     elems = [ii["ReferencedFileID"] for ii in images]
 
-            paths = [[ee.value] if ee.VM == 1 else ee.value for ee in elems]
-            paths = [Path(*p) for p in paths]
+        #     paths = [[ee.value] if ee.VM == 1 else ee.value for ee in elems]
+        #     paths = [Path(*p) for p in paths]
 
-            p = paths[0]
+        #     p = paths[0]
 
-            path = f"{directory}/{p}"
-            path = path.replace("\\",'/')
-            if convert:
-                subprocess.call([dicom2niix_path, '-f', "\"%f_%p_%t_%s\"", "-p",
-                                 "y", "-z", "y", path])
+        #     path = f"{directory}/{p}"
+        #     path = path.replace("\\",'/')
+        #     if convert:
+        #         subprocess.call([dicom2niix_path, '-f', "\"%f_%p_%t_%s\"", "-p",
+        #                          "y", "-z", "y", path])
 
-            path = path.replace(path.split("/")[-1],'')[:-1]
+        #     path = path.replace(path.split("/")[-1],'')[:-1]
 
-            all_sequences.append((path, descr))
+        #     all_sequences.append((path, descr))
 
-    else:
+    # else:
+    if True:
         all_sequences = []
         for subdir, dirs, files in os.walk(directory):
             if len(dirs) !=0 or len(files)< 10:
@@ -180,16 +185,22 @@ def make_directories(bids_dir, pat_id=None, session=None):
     if not os.path.exists(d):
         os.mkdir(d)
 
-    os.mkdir(os.path.join(d, 'anat'))
-    os.mkdir(os.path.join(d, 'dwi'))
+    if not os.path.exists(os.path.join(d, 'anat')):
+        os.mkdir(os.path.join(d, 'anat'))
+    if not os.path.exists(os.path.join(d, 'dwi')):
+        os.mkdir(os.path.join(d, 'dwi'))
 
     deriv = os.path.join(bids_dir, 'derivatives')
 
     def add_derivatives_dirs(derivative):
-        if define_pat_id:
+        try:
             os.mkdir(os.path.join(deriv, derivative,f'sub-{pat_id}'))
-        os.mkdir(os.path.join(deriv, derivative,f'sub-{pat_id}', f'ses-{session}'))
-
+        except FileExistsError:
+            pass
+        try:
+            os.mkdir(os.path.join(deriv, derivative,f'sub-{pat_id}', f'ses-{session}'))
+        except FileExistsError:
+            pass
     add_derivatives_dirs('transformations')
     add_derivatives_dirs('samseg')
     add_derivatives_dirs('stats')
@@ -199,26 +210,96 @@ def make_directories(bids_dir, pat_id=None, session=None):
 
 
 def delete_subject(bids_dir, pat_id):
-    rmtree(os.path.join(bids_dir, f'sub-{pat_id}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'transformations', f'sub-{pat_id}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'samseg', f'sub-{pat_id}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'stats', f'sub-{pat_id}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'segmentations', f'sub-{pat_id}'))
+    try:
+        rmtree(os.path.join(bids_dir, f'sub-{pat_id}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'transformations', f'sub-{pat_id}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'samseg', f'sub-{pat_id}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'stats', f'sub-{pat_id}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'segmentations', f'sub-{pat_id}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
 
 def delete_session(bids_dir, pat_id, session):
-    rmtree(os.path.join(bids_dir, 'derivatives', 'transformations', f'sub-{pat_id}', f'ses-{session}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'samseg', f'sub-{pat_id}', f'ses-{session}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'stats', f'sub-{pat_id}', f'ses-{session}'))
-    rmtree(os.path.join(bids_dir, 'derivatives', 'segmentations', f'sub-{pat_id}', f'ses-{session}'))
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'transformations', f'sub-{pat_id}', f'ses-{session}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'samseg', f'sub-{pat_id}', f'ses-{session}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'stats', f'sub-{pat_id}', f'ses-{session}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, 'derivatives', 'segmentations', f'sub-{pat_id}', f'ses-{session}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
 
 
 def rename_and_move_nifti(dicom_series, bids_dir, pat_id, session='01'):
     IGNORED_SERIES = ['3Plane_Loc_SSFSE', 'Ax T2 Propeller', 'AX REFORMAT',
                       'Opt_DTI_corr', "COR REFORMAT"]
 
+    if len(dicom_series) == 1:
+        path, series = dicom_series[0]
+        moved = []
+        for file in os.listdir(path):
+            if not file.endswith(".nii.gz") or file.replace(".nii.gz", "") in moved:
+                continue
+
+            if file in IGNORED_SERIES or 'Survey' in file:
+                os.remove(os.path.join(path, file))
+                os.remove(os.path.join(path, file.replace('.nii.gz', '.json')))
+                moved.append(file.replace(".nii.gz", ""))
+                continue
+
+            new_names = rename(file.replace(".nii.gz", ""), [file.replace(".nii.gz", "")], path)
+            print(new_names)
+            if new_names is None:
+                print(f"DICOM series not recognized: {file.replace('.nii.gz','')}\nPath: {path}")
+                new_names = [file.replace(".nii.gz", "")]
+
+            for filename, new_name in zip([file.replace(".nii.gz", "")], new_names):
+                dos = 'dwi' if new_name == 'DWI' else 'anat'
+                if new_name != 'DWI':
+
+                    shutil.move(f"{path}/{filename}.nii.gz",
+                              f"{bids_dir}/sub-{pat_id}/ses-{session}/{dos}/sub-{pat_id}_ses-{session}_{new_name}.nii.gz")
+                    shutil.move(f"{path}/{filename}.json",
+                              f"{bids_dir}/sub-{pat_id}/ses-{session}/{dos}/sub-{pat_id}_ses-{session}_{new_name}.json")
+                else:
+
+                    shutil.move(f"{path}/{filename}.nii.gz",
+                              f"{bids_dir}/sub-{pat_id}/ses-{session}/{dos}/sub-{pat_id}_ses-{session}_{new_name}.nii.gz")
+                    shutil.move(f"{path}/{filename}.json",
+                              f"{bids_dir}/sub-{pat_id}/ses-{session}/{dos}/sub-{pat_id}_ses-{session}_{new_name}.json")
+                    shutil.move(f"{path}/{filename}.bval",
+                              f"{bids_dir}/sub-{pat_id}/ses-{session}/{dos}/sub-{pat_id}_ses-{session}_{new_name}.bval")
+                    shutil.move(f"{path}/{filename}.bvec",
+                              f"{bids_dir}/sub-{pat_id}/ses-{session}/{dos}/sub-{pat_id}_ses-{session}_{new_name}.bvec")
+
+            moved.append(file.replace(".nii.gz", ""))
+
+
+
+
 
     for path, series in dicom_series:
-        if series in IGNORED_SERIES or 'ORIG' in series or 'PSIR' in series:
+        if series in IGNORED_SERIES or 'ORIG' in series or 'PSIR' in series or 'Survey' in series:
             for file in os.listdir(path):
                 if file.endswith(".nii.gz") or file.endswith(".json"):
                     os.remove(os.path.join(path, file))
@@ -232,6 +313,10 @@ def rename_and_move_nifti(dicom_series, bids_dir, pat_id, session='01'):
 
         new_names = rename(series, nifti_filenames, path)
         print(new_names)
+        if new_names is None:
+            print(f"DICOM series not recognized: {series}\nPath: {path}")
+            new_names = nifti_filenames
+
         for filename, new_name in zip(nifti_filenames, new_names):
             dos = 'dwi' if new_name == 'DWI' else 'anat'
             if new_name != 'DWI':
