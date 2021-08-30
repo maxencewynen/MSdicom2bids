@@ -248,6 +248,10 @@ def delete_session(bids_dir, pat_id, session):
         rmtree(os.path.join(bids_dir, 'derivatives', 'segmentations', f'sub-{pat_id}', f'ses-{session}'))
     except FileNotFoundError:
         print("[Exception caught] Cannot remove directory that does not exists")
+    try:
+        rmtree(os.path.join(bids_dir, f'sub-{pat_id}', f'ses-{session}'))
+    except FileNotFoundError:
+        print("[Exception caught] Cannot remove directory that does not exists")
 
 
 def rename_and_move_nifti(dicom_series, bids_dir, pat_id, session='01'):
