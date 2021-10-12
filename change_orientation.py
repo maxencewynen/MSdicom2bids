@@ -40,6 +40,30 @@ def separate_epi(subject, session, DIR="/media/stluc/Elements/DISSECT_MS_DATABAS
     img1.to_filename(f"{DIR}/sub-{subject}/ses-{session}/anat/sub-{subject}_ses-{session}_EPI-1.nii.gz")
     img2.to_filename(f"{DIR}/sub-{subject}/ses-{session}/anat/sub-{subject}_ses-{session}_EPI-2.nii.gz")
 
+
+
+def replace_affine_or_header(path_to_img, path_to_target, affine=True, header=False):
+    img = nib.load(path_to_img)
+    target = nib.load(path_to_target)
+    
+    fdata = img.get_fdata()
+    if affine and header:
+        new_image = nib.Nifti1Image(fdata, target.affine, target.header)
+        
+        nib.save(new_image, path_to_img.replace('.nii.gz', 
+                                                '_corr-aff-head.nii.gz'))
+    elif affine and not header:
+        new_image = nib.Nifti1Image(fdata, target.affine, img.header)
+        nib.save(new_image, path_to_img.replace('.nii.gz', 
+                                                '_corr-aff.nii.gz'))
+    elif not affine and header:
+        new_image = nib.Nifti1Image(fdata, img.affine, target.header)
+        nib.save(new_image, path_to_img.replace('.nii.gz', 
+                                                '_corr-head.nii.gz'))
+    
+    
+
+
 if __name__ == '__main__':
     EPI_magnitude = 'acq-mag_T2star'
     EPI_phase = 'acq-phase_T2star'
