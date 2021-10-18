@@ -50,4 +50,34 @@ def reorient_phase_unwrapped(phase_filename, t2star_filename):
     # save the file in the correct directory
     nib.save(phase_nifti, output_name)
     
-    print('[INFO] All done')
+    print("[INFO] Phase Reoriented !")
+    
+
+"""
+function reorient_phase_unwrapped_2: 
+    used to reorient the unwrapped phase image that is returned by the 
+    phase_unwrap docker function. 
+    args: *phase_filename: filename of the unwrapped phase image to reorient 
+                          with its path
+    output: save the reoriented image in the same directory
+"""    
+def reorient_phase_unwrapped_2(phase_filename):
+
+    mri = nib.load(phase_filename)
+    
+    mri_data = mri.get_fdata()
+    
+    mri_r = np.rot90(mri_data, k=2, axes=(0,1))
+    
+    mri_nifti = nib.Nifti1Image(mri_r, mri.affine)
+        
+    # get the path to the directory
+    phase_name = phase_filename.split('.')
+    
+    # creation of the output name for the output file
+    output_name = phase_name+"_reoriented_2.nii.gz"
+    
+    # save the file in the correct directory
+    nib.save(mri_nifti, output_name)
+    
+    print("[INFO] Phase Reoriented !")
