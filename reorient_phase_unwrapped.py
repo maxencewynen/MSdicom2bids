@@ -62,6 +62,7 @@ function reorient_phase_unwrapped_2:
     output: save the reoriented image in the same directory
 """    
 def reorient_phase_unwrapped_2(phase_filename):
+    # print(phase_filename)
 
     mri = nib.load(phase_filename)
     
@@ -73,9 +74,10 @@ def reorient_phase_unwrapped_2(phase_filename):
         
     # get the path to the directory
     phase_name = phase_filename.split('.')
+    # print(phase_name)
     
     # creation of the output name for the output file
-    output_name = phase_name+"_reoriented_2.nii.gz"
+    output_name = phase_name[0]+"_reoriented_2.nii.gz"
     
     # save the file in the correct directory
     nib.save(mri_nifti, output_name)
