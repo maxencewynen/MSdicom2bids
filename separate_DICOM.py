@@ -3,7 +3,7 @@
 """
 Created on Thu Oct 21 15:24:32 2021
 
-@author: stluc
+@author: ColinVDB
 """
 
 # Alex Weston
@@ -20,8 +20,8 @@ def clean_text(string):
     return string.lower()  
    
 # user specified parameters
-src = "/home/stluc/Desktop/test_DICOM/anon_flair_sag_vfl"
-dst = "/home/stluc/Desktop/test_DICOM/anon_flair_sag_vfl/sorted"
+src = "/media/maggi/MS-PRL/MS-PRL/MS-PRL_Brussels/DICOM/sub-059/ses-02/DICOM"
+dst = src + "/sorted"
 
 print('reading file list...')
 unsortedList = []
@@ -35,7 +35,7 @@ print('%s files found.' % len(unsortedList))
 for dicom_loc in unsortedList:
     # read the file
     ds = pydicom.read_file(dicom_loc, force=True)
-   
+    
     # # get patient, study, and series information
     patientID = clean_text(ds.get("PatientID", "NA"))
     # studyDate = clean_text(ds.get("StudyDate", "NA"))
@@ -50,21 +50,24 @@ for dicom_loc in unsortedList:
     # fileName = modality + "." + seriesInstanceUID + "." + instanceNumber + ".dcm"
     
     # get scanning sequence
-    scan_seq = ds.get("ScanningSequence")
-    scanning_sequence = ""
-    for i in range(len(scan_seq)):
-        if i == 0:
-            scanning_sequence = scanning_sequence + scan_seq[i]
-        else:
-            scanning_sequence = scanning_sequence + "-" + scan_seq[i]
+    scanning_sequence = ds.get("SeriesDescription")
+    
+    if scanning_sequence == None:
+        scanning_sequence = "NoSeriesDescription"
+    
+    scanning_sequence = scanning_sequence.replace(" ", "_")
+    
+    scanning_sequence = scanning_sequence.replace("*", "-")
+    
+    scanning_sequence = scanning_sequence.replace(".", "")
     
     fileName = patientID + "_" + scanning_sequence + "_" + instanceNumber + ".dcm"
        
-    # uncompress files (using the gdcm package)
-    try:
-        ds.decompress()
-    except:
-        print('an instance in file %s" could not be decompressed. exiting.' % (patientID))
+    # # uncompress files (using the gdcm package)
+    # try:
+    #     ds.decompress()
+    # except:
+    #     print('an instance in file %s" could not be decompressed. exiting.' % (patientID))
    
     # save files to a 4-tier nested folder structure
     if not os.path.exists(os.path.join(dst, scanning_sequence)):

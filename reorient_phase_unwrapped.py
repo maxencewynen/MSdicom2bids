@@ -3,7 +3,7 @@
 """
 Created on Mon Oct 11 16:08:39 2021
 
-@author: maggi
+@author: ColinVDB
 """
 import nibabel as nib
 import numpy as np
