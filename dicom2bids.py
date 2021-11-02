@@ -131,7 +131,8 @@ class BIDSHandler:
                                            'segmentations',
                                            'QSM',
                                            'MP2RAGE',
-                                           'acq-star_FLAIR'],
+                                           'acq-star_FLAIR',
+                                           'skullstripped'],
                         registrations = ['T2star',
                                          'FLAIR',
                                          'MPRAGE',
@@ -155,7 +156,8 @@ class BIDSHandler:
                                            'segmentations',
                                            'QSM',
                                            'MP2RAGE',
-                                           'acq-star_FLAIR'],
+                                           'acq-star_FLAIR',
+                                           'skullstripped'],
                             registrations = ['T2star',
                                              'FLAIR',
                                              'MPRAGE',
@@ -230,10 +232,15 @@ class BIDSHandler:
         
         if derivatives is None:
             derivatives = []
+            
+        if registrations is None:            
+            all_derivatives.append("transformation_matrices")
+            all_derivatives.append("lesionmasks")
+            
         all_derivatives = list(set().union(all_derivatives, derivatives))
-        
+
         BIDSHandler.mkdirs_if_not_exist(deriv, all_derivatives)
-        if len(derivatives) > 0:
+        if registrations is not None:
             BIDSHandler.mkdir_if_not_exists(pjoin(deriv, 'registrations'))
         
         if "registrations" in all_derivatives:
@@ -494,14 +501,19 @@ class BIDSHandler:
 
 if __name__ == '__main__':
     pass
-    # directory = "D:/WSBIM/ROSE"
-    # dicom2niix_path = "C:/Users/maxen/OneDrive/Bureau/UCLouvain/Q14/WSBIM2243/project/dcm2niix.exe"
-    # bids_dir = "C:/Users/maxen/OneDrive/Bureau/UCLouvain/Q14/WSBIM2243/project/WSBIM2243/database"
-
-
-
-    # dicom_series = convert_all_dicoms(directory, dicom2niix_path)
-    # pat_id, session = make_directories(bids_dir)
-    # rename_and_move_nifti(dicom_series, bids_dir, pat_id, session)
+    dicom2niix_path = r"C:\Users\Cristina\Downloads\dcm2niix.exe"
+    bidshandler = BIDSHandler(root_dir=r"C:\Users\Cristina\Documents\deleteme\BIDS_EXAMPLE\BIDS_ROOT",#r"/media/maggi/MS-PRL/MS-PRL/MS-PRL_Brussels",
+                          dicom2niix_path = dicom2niix_path)
+    
+    DICOM_FOLDER = r"C:\Users\Cristina\Documents\deleteme\BIDS_EXAMPLE\131-DICOM"
+    PATIENT_ID = None
+    SESSION = None
+    
+    pat_id, session, dicom_series = bidshandler.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 
+                                                                       pat_id      = PATIENT_ID,
+                                                                       session     = SESSION, 
+                                                                       return_dicom_series=True)
+    
+    print("[INFO] Done")
 
 
