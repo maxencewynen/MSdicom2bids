@@ -313,7 +313,8 @@ class BIDSHandler:
         
         def move_all(path, filename, file_extensions, dest_dir, new_filename):
             for file_extension in file_extensions:
-                shutil.move(pjoin(path, f"{filename}.{file_extension}"),
+                if pexists(pjoin(path, f"{filename}.{file_extension}")):
+                    shutil.move(pjoin(path, f"{filename}.{file_extension}"),
                             pjoin(dest_dir, f"{new_filename}.{file_extension}"))
         
         bids_dir = self.root_dir

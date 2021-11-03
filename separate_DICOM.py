@@ -18,23 +18,25 @@ def clean_text(string):
     for symbol in forbidden_symbols:
         string = string.replace(symbol, "_") # replace everything with an underscore
     return string.lower()  
+
+wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
    
 # user specified parameters
-src = "/media/maggi/MS-PRL/MS-PRL/MS-PRL_Brussels/DICOM/sub-059/ses-02/DICOM"
+src = "/home/stluc/ColinVDB/PhD/dwi/DICOM/BEN-ABOUD-09-MAR-2021/test_same_seq_name"
 dst = src + "/sorted"
 
 print('reading file list...')
 unsortedList = []
 for root, dirs, files in os.walk(src):
     for file in files: 
-        if ".dcm" in file or "." not in file:# exclude non-dicoms, good for messy folders
+        if "." not in file[0] or not any([ext in file for ext in wrong_extensions]):# exclude non-dicoms, good for messy folders
             unsortedList.append(os.path.join(root, file))
 
 print('%s files found.' % len(unsortedList))
-       
+
 for dicom_loc in unsortedList:
     # read the file
-    ds = pydicom.read_file(dicom_loc, force=True)
+    ds = pydicom.dcmread(dicom_loc, force=True)
     
     # # get patient, study, and series information
     patientID = clean_text(ds.get("PatientID", "NA"))
@@ -53,13 +55,12 @@ for dicom_loc in unsortedList:
     scanning_sequence = ds.get("SeriesDescription")
     
     if scanning_sequence == None:
-        scanning_sequence = "NoSeriesDescription"
+        scanning_sequence = ds.get("SequenceName")
+        
+    if scanning_sequence == None:
+        scanning_sequence = "NoScanningSequence"
     
-    scanning_sequence = scanning_sequence.replace(" ", "_")
-    
-    scanning_sequence = scanning_sequence.replace("*", "-")
-    
-    scanning_sequence = scanning_sequence.replace(".", "")
+    scanning_sequence = clean_text(scanning_sequence)
     
     fileName = patientID + "_" + scanning_sequence + "_" + instanceNumber + ".dcm"
        
