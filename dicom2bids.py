@@ -40,7 +40,13 @@ class BIDSHandler:
         if '3D EPI' in series or "SWI_EPI" in series:
             return ["acq-mag_T2star"]
         if 'Opt_DTI' in series or 'DWI' in series:
-            return ["DWI"]
+            if len(filenames)>1:
+                new_filenames = []
+                for filename in filenames:
+                    new_filenames.append('DWI')
+                return new_filenames
+            else:
+                return ["DWI"]
         if "T1map" in series:
             return ["T1map"]
         if "DIR" in series:
@@ -312,9 +318,21 @@ class BIDSHandler:
     def rename_and_move_nifti(self, dicom_series, pat_id, session='01'):
         
         def move_all(path, filename, file_extensions, dest_dir, new_filename):
+            print(filename)
             for file_extension in file_extensions:
                 if pexists(pjoin(path, f"{filename}.{file_extension}")):
-                    shutil.move(pjoin(path, f"{filename}.{file_extension}"),
+                    if pexists(pjoin(dest_dir, f"{new_filename}.{file_extension}")):
+                        print('File already existing in dest dir', pjoin(dest_dir, f"{new_filename}.{file_extension}"))
+                        ext = 'a'
+                        for i in range(26):
+                            if not pexists(pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}")):
+                                shutil.move(pjoin(path, f"{filename}.{file_extension}"),
+                                        pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}"))
+                                break
+                            else:
+                                ext = chr(ord(ext)+1)
+                    else:
+                        shutil.move(pjoin(path, f"{filename}.{file_extension}"),
                             pjoin(dest_dir, f"{new_filename}.{file_extension}"))
         
         bids_dir = self.root_dir
@@ -384,11 +402,9 @@ class BIDSHandler:
     
     
             new_names = BIDSHandler.rename(series, nifti_filenames, path)
-            print(new_names)
             if new_names is None:
                 print(f"DICOM series not recognized: {series}\nPath: {path}")
                 new_names = nifti_filenames
-    
             for filename, new_name in zip(nifti_filenames, new_names):
                 dos = 'dwi' if new_name == 'DWI' else 'anat'
                 if new_name == "DWI":
@@ -495,10 +511,72 @@ class BIDSHandler:
         
         self.copy_dicomfolder_to_sourcedata(dicomfolder, pat_id, session)
         
+        self.separate_dicoms(dicomfolder, pat_id, session)
+        
         if return_dicom_series:
             return pat_id, session, dicom_series
         return pat_id, session
 
+    def separate_dicoms(self, src, sub, ses):
+        print('[INFO] Sorting dicoms ...')
+        def clean_text(string):
+            # clean and standardize text descriptions, which makes searching files easier
+            forbidden_symbols = ["*", ".", ",", "\"", "\\", "/", "|", "[", "]", ":", ";", " "]
+            for symbol in forbidden_symbols:
+                string = string.replace(symbol, "_") # replace everything with an underscore
+            return string.lower()  
+
+        wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
+        
+        dst = f"{self.root_dir}/sourcedata/sub-{sub}/ses-{ses}/DICOM/sorted"
+
+        print('reading file list...')
+        unsortedList = []
+        corresponding_root = []
+        for root, dirs, files in os.walk(src):
+            for file in files: 
+                if "." not in file[0] or not any([ext in file for ext in wrong_extensions]):# exclude non-dicoms, good for messy folders
+                    unsortedList.append(os.path.join(root, file))
+                    corresponding_root.append(root)
+
+        print('%s files found.' % len(unsortedList))
+
+        for dicom_loc in unsortedList:
+            # read the file
+            ds = dcmread(dicom_loc, force=True)
+            
+            # find folder_name
+            path = dicom_loc.split('/')
+            folder = path[len(path)-2]
+            
+            # get patient, study, and series information
+            patientID = clean_text(ds.get("PatientID", "NA"))
+           
+            # generate new, standardized file name
+            instanceNumber = str(ds.get("InstanceNumber","0"))
+            
+            # get scanning sequence
+            scanning_sequence = ds.get("SeriesDescription")
+            
+            if scanning_sequence == None:
+                scanning_sequence = ds.get("SequenceName")
+                
+            if scanning_sequence == None:
+                scanning_sequence = "NoScanningSequence"
+            
+            scanning_sequence = folder + '_' + scanning_sequence
+            
+            scanning_sequence = clean_text(scanning_sequence)
+            
+            fileName = patientID + "_" + scanning_sequence + "_" + instanceNumber + ".dcm"
+           
+            # save files to a 4-tier nested folder structure
+            if not os.path.exists(os.path.join(dst, scanning_sequence)):
+                os.makedirs(os.path.join(dst, scanning_sequence))
+           
+            ds.save_as(os.path.join(dst, scanning_sequence, fileName))
+
+        print('done.')
 
 if __name__ == '__main__':
     pass
