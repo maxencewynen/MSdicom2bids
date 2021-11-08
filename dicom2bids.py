@@ -15,6 +15,7 @@ import json
 import shutil
 from os.path import join as pjoin
 from os.path import exists as pexists
+import pandas as pd
 
 from pydicom import dcmread
 
@@ -511,11 +512,14 @@ class BIDSHandler:
         
         self.copy_dicomfolder_to_sourcedata(dicomfolder, pat_id, session)
         
-        self.separate_dicoms(dicomfolder, pat_id, session)
+        pat_name, pat_date = self.separate_dicoms(dicomfolder, pat_id, session)
+        
+        self.anonymisation(pat_name, pat_date, pat_id, session)
         
         if return_dicom_series:
             return pat_id, session, dicom_series
         return pat_id, session
+
 
     def separate_dicoms(self, src, sub, ses):
         print('[INFO] Sorting dicoms ...')
@@ -540,10 +544,24 @@ class BIDSHandler:
                     corresponding_root.append(root)
 
         print('%s files found.' % len(unsortedList))
+        
+        pat_name = None
+        pat_date = None
 
         for dicom_loc in unsortedList:
             # read the file
             ds = dcmread(dicom_loc, force=True)
+            
+            if pat_name == None:
+                pat_name = ds.get('PatientName')
+            if pat_name == None:
+                pat_name = ds.get('Name')
+            if pat_date == None:
+                pat_date = ds.get('ContentDate')
+            if pat_date == None:
+                pat_date = ds.get('Date')
+            if pat_date == None:
+                pat_date = ds.get('AcquisitionDate')
             
             # find folder_name
             path = dicom_loc.split('/')
@@ -575,8 +593,38 @@ class BIDSHandler:
                 os.makedirs(os.path.join(dst, scanning_sequence))
            
             ds.save_as(os.path.join(dst, scanning_sequence, fileName))
-
+        
         print('done.')
+        
+        return pat_name, pat_date
+
+    def anonymisation(self, pat_name, pat_date, pat_id, pat_ses):
+        
+        if pexists(pjoin(self.root_dir, "anonymisation.csv")):
+            anonym = pd.read_csv(pjoin(self.root_dir, "anonymisation.csv")).to_dict()
+        else:
+            anonym = {'PatientName':{}, 'Bids_ID':{}, 'Date ses-01':{}}
+            
+        # check if new patient 
+        if pat_ses != '01':
+            key_num = list(anonym['Bids_ID'].values()).index(int(pat_id))
+            if f'Date ses-{pat_ses}' not in anonym.keys():
+                anonym[f'Date ses-{pat_ses}'] = {}
+            # update dicionary with the date of the new session
+            anonym[f'Date ses-{pat_ses}'][key_num] = pat_date
+        else:
+            # add new patient 
+            key_num = len(anonym['Bids_ID'])
+            anonym['PatientName'][key_num] = pat_name
+            anonym['Bids_ID'][key_num] = pat_id
+            anonym['Date ses-01'][key_num] = pat_date
+            
+        # Save anonym dic to csv
+        anonym_df = pd.DataFrame(anonym)
+        anonym_df.to_csv(pjoin(self.root_dir, "anonymisation.csv"), index=False)
+        
+        print('[INFO] Anonymisation done')
+        
 
 if __name__ == '__main__':
     pass
