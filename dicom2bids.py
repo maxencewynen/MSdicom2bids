@@ -129,16 +129,16 @@ class BIDSHandler:
         
         for dirname in directories:
             BIDSHandler.mkdir_if_not_exists(pjoin(root_dir, dirname))
+            
     
-    def make_directories(self, 
-                         pat_id=None, 
-                         session=None,
+    def make_directories(self, pat_id=None, session=None, 
                          derivatives = ['samseg', 
                                            'stats', 
                                            'segmentations',
                                            'QSM',
                                            'MP2RAGE',
                                            'acq-star_FLAIR',
+                                           'acq-phase_T2star',
                                            'skullstripped'],
                         registrations = ['T2star',
                                          'FLAIR',
@@ -628,19 +628,19 @@ class BIDSHandler:
 
 if __name__ == '__main__':
     pass
-    dicom2niix_path = r"C:\Users\Cristina\Downloads\dcm2niix.exe"
-    bidshandler = BIDSHandler(root_dir=r"C:\Users\Cristina\Documents\deleteme\BIDS_EXAMPLE\BIDS_ROOT",#r"/media/maggi/MS-PRL/MS-PRL/MS-PRL_Brussels",
-                          dicom2niix_path = dicom2niix_path)
+    # dicom2niix_path = r"C:\Users\Cristina\Downloads\dcm2niix.exe"
+    # bidshandler = BIDSHandler(root_dir=r"C:\Users\Cristina\Documents\deleteme\BIDS_EXAMPLE\BIDS_ROOT",#r"/media/maggi/MS-PRL/MS-PRL/MS-PRL_Brussels",
+    #                       dicom2niix_path = dicom2niix_path)
     
-    DICOM_FOLDER = r"C:\Users\Cristina\Documents\deleteme\BIDS_EXAMPLE\131-DICOM"
-    PATIENT_ID = None
-    SESSION = None
+    # DICOM_FOLDER = r"C:\Users\Cristina\Documents\deleteme\BIDS_EXAMPLE\131-DICOM"
+    # PATIENT_ID = None
+    # SESSION = None
     
-    pat_id, session, dicom_series = bidshandler.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 
-                                                                       pat_id      = PATIENT_ID,
-                                                                       session     = SESSION, 
-                                                                       return_dicom_series=True)
+    # pat_id, session, dicom_series = bidshandler.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 
+    #                                                                    pat_id      = PATIENT_ID,
+    #                                                                    session     = SESSION, 
+    #                                                                    return_dicom_series=True)
     
-    print("[INFO] Done")
+    # print("[INFO] Done")
 
 
