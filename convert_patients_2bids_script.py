@@ -18,15 +18,21 @@ list_dicoms = ['',
 
 bidshandler = BIDSHandler(root_dir=r'', dicom2niix_path=dicom2niix_path)
 
+pat_id = 0
+
 for dicom in list_dicoms:
     
     DICOM_FOLDER = dicom
     PATIENT_ID = None
     SESSION = None
     
-    pat_id, session, dicom_series = bidshandler.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 
+    try:
+        pat_id, session, dicom_series = bidshandler.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 
                                                                         pat_id      = PATIENT_ID,
                                                                         session     = SESSION, 
                                                                         return_dicom_series=True)
+    except:
+        print(f'[ERROR] Didom to Bids failed for patient {pat_id+1}')
     print(f"[INFO] done for patient {pat_id}")
 print("[INFO] All done.")
+
