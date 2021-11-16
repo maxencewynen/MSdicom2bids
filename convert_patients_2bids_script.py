@@ -14,11 +14,7 @@ import zipfile
 
 dicom2niix_path = "dcm2niix"
 
-list_dicoms = ["/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/DUPONT_27aug2021",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/DURANT_22062021.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Dzelili.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/EL-AKEL-27072021.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/ELBOUTZSAKHTI_19feb2021.zip",
+list_dicoms = ["/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/ELBOUTZSAKHTI_19feb2021.zip",
 "/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Elghalbzouri020421.zip",
 "/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/FRAIOLI_16061965.zip",
 "/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/FRIZ07-10-21.zip",
