@@ -39,10 +39,10 @@ class MainWindow:
         
         self.center()
         
-        self.bids_dir = tk.filedialog.askdirectory(initialdir='/home', title='Select or create your BIDS directory')
+        self.bids_dir = tk.filedialog.askdirectory(initialdir='/', title='Select or create your BIDS directory')
             
         while self.bids_dir == ():
-            self.bids_dir = tk.filedialog.askdirectory(initialdir='/home', title='Please, select or create your BIDS directory')
+            self.bids_dir = tk.filedialog.askdirectory(initialdir='/', title='Please, select or create your BIDS directory')
         
         self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path=dicom2niix_path)
         
@@ -63,8 +63,12 @@ class MainWindow:
         # =====================================================================
         bids_dir_split = self.bids_dir.split('/')
         Bids_name = bids_dir_split[len(bids_dir_split)-1]
-        label_bids = tk.Label(self.root, text=Bids_name, font=('Arial', 25))
-        label_bids.pack()
+        label_bids = tk.Label(self.root, text=Bids_name, font=('Calibri', 25))
+        label_bids.grid(row=0, column=1)
+        label_subjects = tk.Label(self.root, text='Number of subjects: ', font=('Calibri',15))
+        label_subjects.grid(row=1, column=0)
+        label_num_subjects = tk.Label(self.root, text=self.bids.number_of_subjects, font=('Calibri',15), anchor='w')
+        label_num_subjects.grid(row=1, column=1, sticky='w')
         
 launch = MainWindow()
 

@@ -30,6 +30,13 @@ class BIDSHandler:
                                "COR REFORMAT"]
         self.dicom2niix_path = dicom2niix_path
 
+        all_directories = [x for x in next(os.walk(root_dir))[1]]
+        all_subj_dir = []
+        for d in all_directories:
+            if d.find('sub-') == 0:
+                all_subj_dir.append(d)
+        self.number_of_subjects = len(all_subj_dir)
+
     @staticmethod
     def rename(series, filenames, path):
         if 'MPRAGE' in series or '3DT1' in series:
