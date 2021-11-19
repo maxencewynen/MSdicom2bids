@@ -8,61 +8,65 @@ BIDS MANAGER GUI
 """
 
 import sys
+import os
 from dicom2bids import *
 import logging
 from PyQt5.QtCore import QSize, Qt, QModelIndex
 from PyQt5.QtWidgets import QDesktopWidget, QApplication, QWidget, QPushButton, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QTreeView, QFileSystemModel, QGridLayout, QPlainTextEdit, QMessageBox, QListWidget, QTableWidget, QTableWidgetItem
 from PyQt5.QtGui import QFont
+import traceback
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        
+
     def init_ui(self):
         self.setWindowTitle('Main Window')
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.center()
-        
+
         self.bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
         while self.bids_dir=="":
             self.bids_dir = str(QFileDialog.getExistingDirectory(self, "Please, select BIDS Directory"))
-        
-        self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path="dcm2niix")
+
+        self.dcm2niix_path = None if os.name == 'nt' else "dcm2niix"
+
+        self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path=self.dcm2niix_path)
         bids_dir_split = self.bids_dir.split('/')
         self.bids_name = bids_dir_split[len(bids_dir_split)-1]
         self.bids_lab = QLabel(self.bids_name)
         self.bids_lab.setFont(QFont('Calibri', 30))
-        
+
         self.bids_dir_view = BidsDirView(self)
-        
+
         self.bids_metadata = BidsMetadata(self)
-        
+
         self.bids_actions = BidsActions(self)
-        
+
         self.bids_dialog = BidsDialog(self)
-        
+
         layout = QGridLayout()
         layout.addWidget(self.bids_lab, 0, 1, 1, 2)
         layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
         layout.addWidget(self.bids_metadata, 1, 1)
         layout.addWidget(self.bids_actions, 1, 2)
         layout.addWidget(self.bids_dialog, 2, 1, 1, 2)
-        
+
         self.window.setLayout(layout)
-        
+
         self.center()
-    
+
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
+
     def closeEvent(self, event):
         sys.stdout = self.bids_dialog.stdout
-        
+
     def update_bids(self):
         print("update_bids!")
         # bids_dir_split = self.bids.root_dir.split('/')
@@ -70,7 +74,7 @@ class MainWindow(QMainWindow):
         # self.bids_lab.setText(self.bids_name)
         # self.bids_metadata.update_metadata()
         # self.bids_dir_view.update_dir()
-        
+
         bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
         if os.path.isdir(bids_dir):
             self.bids_dir = bids_dir
@@ -79,13 +83,13 @@ class MainWindow(QMainWindow):
             self.bids_name = bids_dir_split[len(bids_dir_split)-1]
             self.bids_lab = QLabel(self.bids_name)
             self.bids_lab.setFont(QFont('Calibri', 30))
-            
+
             self.bids_dir_view = BidsDirView(self)
-            
+
             self.bids_metadata = BidsMetadata(self)
-            
+
             self.bids_actions.update_bids(self)
-            
+
             layout = QGridLayout()
             layout.addWidget(self.bids_lab, 0, 1, 1, 2)
             layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
@@ -97,48 +101,48 @@ class MainWindow(QMainWindow):
             self.window.setLayout(layout)
         else:
             pass
-        
+
 # class OpeningWindow(QWidget):
 #     def __init__(self):
 #         super().__init__()
 #         self.init_ui()
-        
-#     def init_ui(self):        
+
+#     def init_ui(self):
 #         self.setWindowTitle('OpeningWindow')
 #         self.center()
-        
+
 #         label = QLabel("Select or Create your BIDS Directory")
-        
+
 #         button = QPushButton('Browse')
 #         button.clicked.connect(self.browse)
-        
+
 #         layout = QVBoxLayout()
 #         layout.addWidget(label)
 #         layout.addWidget(button)
-        
-#         self.setLayout(layout)        
-                
+
+#         self.setLayout(layout)
+
 #     def center(self):
 #         qr = self.frameGeometry()
 #         cp = QDesktopWidget().availableGeometry().center()
 #         qr.moveCenter(cp)
 #         self.move(cp)
-        
+
 #     def browse(self):
-#         print('Browse')       
+#         print('Browse')
 #         self.folderpath = QFileDialog.getExistingDirectory(self, 'Select Folder')
-        
+
 #         print(self.folderpath)
- 
+
 class BidsDirView(QWidget):
-    
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         dir_path = self.parent.bids_dir
         self.setWindowTitle('File System Viewer')
         self.setMinimumSize(250, 700)
-        
+
         self.model = QFileSystemModel()
         self.model.setRootPath(dir_path)
         self.tree = QTreeView()
@@ -148,17 +152,17 @@ class BidsDirView(QWidget):
         self.tree.setAlternatingRowColors(True)
         self.tree.doubleClicked.connect(self.treeMedia_doubleClicked)
         # self.tree.rightClicked.connect(self.treeMedia_rightClicked)
-        
+
         layout = QVBoxLayout()
         layout.addWidget(self.tree)
         self.setLayout(layout)
-        
-    def update_dir(self):        
+
+    def update_dir(self):
         self.model = QFileSystemModel()
         self.model.setRootPath(self.parent.bids_dir)
         self.tree.setModel(self.model)
         self.tree.setRootIndex(self.model.index(self.parent.bids_dir))
-        
+
     def treeMedia_doubleClicked(self, index):
         item = self.tree.selectedIndexes()[0]
         item_path = item.model().filePath(index)
@@ -170,7 +174,7 @@ class BidsDirView(QWidget):
                 os.system(f"xdg-open {item_path}")
         else:
             pass
-    
+
     # def treeMedia_rightClicked(self, index):
     #     item = self.tree.selectedIndexes()[0]
     #     print(item.model().filePath(index))
@@ -182,12 +186,12 @@ class BidsDirView(QWidget):
     #         pass
 
 # class BidsDirView(QWidget):
-    
+
 #     def __init__(self, dir_path):
 # 		super().__init__()
 #         self.setWindowTitle('File System Viewer')
 # 		self.setMinimumSize(250, 700)
-        		
+
 # 		self.model = QFileSystemModel()
 # 		self.model.setRootPath(dir_path)
 # 		self.tree =  QTreeView()
@@ -199,46 +203,46 @@ class BidsDirView(QWidget):
 # 		layout = QVBoxLayout()
 # 		layout.addWidget(self.tree)
 # 		self.setLayout(layout)
-        
+
 class BidsMetadata(QWidget):
-    
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
         self.number_of_subjects = QLabel(f"Number of subjects: {self.bids.number_of_subjects}")
         self.number_of_subjects.setFont(QFont('Calibri', 15))
-        
+
         layout = QVBoxLayout()
         layout.addWidget(self.number_of_subjects)
         self.setLayout(layout)
-    
+
     def update_metadata(self):
         self.bids = self.parent.bids
         self.number_of_subjects.setText(f"Number of subjects: {self.bids.number_of_subjects}")
-        
+
 class BidsActions(QWidget):
-    
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
-        
+
         self.change_bids_dir_button = QPushButton("Change BIDS Directory")
         self.change_bids_dir_button.clicked.connect(self.change_bids_dir)
-        
+
         self.add_button = QPushButton("Add")
         self.add_button.clicked.connect(self.add)
-        
+
         self.remove_button = QPushButton("Remove")
         self.remove_button.clicked.connect(self.remove)
-        
+
         self.rename_sub_button = QPushButton("Rename subject")
         self.rename_sub_button.clicked.connect(self.rename_sub)
-        
+
         self.rename_ses_button = QPushButton("Rename session")
         self.rename_ses_button.clicked.connect(self.rename_ses)
-        
+
         layout = QVBoxLayout()
         sub_layout = QHBoxLayout()
         sub_layout.addWidget(self.add_button)
@@ -249,9 +253,9 @@ class BidsActions(QWidget):
         layout.addWidget(self.change_bids_dir_button)
         layout.addLayout(sub_layout)
         layout.addLayout(sub_layout_1)
-        
+
         self.setLayout(layout)
-        
+
     def change_bids_dir(self):
         print("change_bids_dir")
         # bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
@@ -260,59 +264,65 @@ class BidsActions(QWidget):
         #     self.parent.bids = self.bids
         #     self.parent.update_bids()
         self.parent.update_bids()
-        
+
     def add(self):
         print("add")
         self.add_win = AddWindow(self)
+        if not self.parent.dcm2niix_path:
+            # ajouter une fenetre
+            path = QFileDialog.getOpenFileName(self, "Select 'dcm2niix.exe' path")[0]
+            self.parent.dcm2niix_path = path
         self.add_win.show()
-        
+
     def remove(self):
         print("remove")
         self.rm_win = RemoveWindow(self)
         self.rm_win.show()
-        
+
     def rename_sub(self):
         print("rename_sub")
         self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
-        
+
     def rename_ses(self):
         print("rename_ses")
-        
+
     def update_bids(self, parent):
         self.parent = parent
         self.bids = self.parent.bids
-        
+
+
+
 class RemoveWindow(QMainWindow):
-    
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
-        
+
         self.setWindowTitle("Remove subject or session")
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.center()
-        
+
         self.label = QLabel("Select subject or session to remove")
         self.label.setAlignment(Qt.AlignHCenter)
         self.subject = QLineEdit(self)
         self.subject.setPlaceholderText('Subject number')
         self.session = QLineEdit(self)
         self.session.setPlaceholderText('Session number')
-        
+
         self.remove_button = QPushButton("Remove")
         self.remove_button.clicked.connect(self.remove)
-        
+
         layout = QGridLayout()
         layout.addWidget(self.label, 0, 0, 1, 2)
         layout.addWidget(self.subject, 1, 0, 1, 1)
         layout.addWidget(self.session, 1, 1, 1, 1)
         layout.addWidget(self.remove_button, 2, 0, 1, 2)
-        
+
         self.window.setLayout(layout)
-        
+
     def remove(self):
         subject = self.subject.text()
         session = self.session.text()
@@ -322,27 +332,27 @@ class RemoveWindow(QMainWindow):
                 self.bids.delete_session(subject, session)
             else:
                 self.bids.delete_subject(subject)
-        
+
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
-class AddWindow(QMainWindow):          
-    
+
+class AddWindow(QMainWindow):
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
-        
+
         self.setWindowTitle("Add subject or session")
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.center()
-        
+
         self.list_to_add = []
-        
+
         self.label = QLabel("Select DICOM folders to add to BIDS directory")
         self.label.setAlignment(Qt.AlignHCenter)
         self.subject = QLineEdit(self)
@@ -363,7 +373,7 @@ class AddWindow(QMainWindow):
         self.list_view.setHorizontalHeaderLabels(["path", "subject", "session"])
         self.add_button = QPushButton("Add to BIDS directory")
         self.add_button.clicked.connect(self.add)
-        
+
         layout = QGridLayout()
         layout.addWidget(self.label, 0, 0, 1, 2)
         layout.addWidget(self.subject, 1, 0, 1, 1)
@@ -372,9 +382,9 @@ class AddWindow(QMainWindow):
         layout.addWidget(self.add_files_button, 2, 1, 1, 1)
         layout.addWidget(self.list_view, 3, 0, 1, 2)
         layout.addWidget(self.add_button, 4, 0, 1, 2)
-        
+
         self.window.setLayout(layout)
-        
+
     def add_folder(self):
         dicom_folder = str(QFileDialog.getExistingDirectory(self, "Select DICOM folder"))
         rowPosition = len(self.list_to_add)
@@ -390,7 +400,7 @@ class AddWindow(QMainWindow):
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
         self.list_to_add.append((dicom_folder, subject, session))
 
-    
+
     def add_files(self):
         dicom_folder = QFileDialog.getOpenFileName(self, 'Select DICOM zip file')[0]
         rowPosition = len(self.list_to_add)
@@ -405,78 +415,82 @@ class AddWindow(QMainWindow):
         self.list_view.setItem(rowPosition , 1, QTableWidgetItem(subject))
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
         self.list_to_add.append((dicom_folder, subject, session))
-    
+
     def add(self):
         for item in self.list_to_add:
-            
+
             dicom = item[0]
-            
+
             if ".zip" in dicom:
                 directory_to_extract_to = dicom[:-4]
                 with zipfile.ZipFile(dicom, 'r') as zip_ref:
                     zip_ref.extractall(directory_to_extract_to)
                 dicom = directory_to_extract_to
-            
+
             DICOM_FOLDER = dicom
             PATIENT_ID = item[1]
             SESSION = item[2]
 
             try:
-                pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 
+                pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
                                                                                 pat_id      = PATIENT_ID,
-                                                                                session     = SESSION, 
+                                                                                session     = SESSION,
                                                                                 return_dicom_series=True)
                 print(f"[INFO] done for patient {pat_id}")
             except:
-                print(f'[ERROR] Didom to Bids failed for {DICOM_FOLDER}')
+                print(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}:')
+                # exc_type, exc_obj, exc_tb = sys.exc_info()
+                # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                # print(exc_type, fname, exc_tb.tb_lineno)
+                traceback.print_exc()
         print("[INFO] All done.")
-        
+
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
+
 class RenameSubject(QMainWindow):
-    
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
-        
+
         self.setWindowTitle("Rename Subject")
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.center()
-        
+
         self.old_sub = QLineEdit(self)
         self.old_sub.setPlaceholderText("Old Subject ID")
         self.new_sub = QLineEdit(self)
         self.new_sub.setPlaceholderText("New Subject ID")
         self.rename_button = QPushButton("Rename Subject")
         self.rename_button.clicked.connect(self.rename)
-        
+
         layout = QGridLayout()
         layout.addWidget(self.old_sub, 0, 0, 1, 1)
         layout.addWidget(self.new_sub, 0, 1, 1, 1)
         layout.addWidget(self.rename_button, 1, 0, 1, 2)
-        
+
         self.window.setLayout(layout)
-        
+
     def rename(self):
         old_sub = self.old_sub.text()
         new_sub = self.new_sub.text()
-        
+
         self.bids.rename_subject(old_sub, new_sub)
         print(f"sub-{old_sub} renamed to sub-{new_sub}")
-        
+
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
-        
+
+
 class QTextEditLogger(logging.Handler):
     def __init__(self, parent):
         super().__init__()
@@ -488,13 +502,13 @@ class QTextEditLogger(logging.Handler):
         self.widget.appendPlainText(msg)
 
 class BidsDialog(QDialog, QPlainTextEdit):
-    
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        
+
         self.setMinimumSize(700,300)
-        
+
         logTextBox = QTextEditLogger(self)
         logTextBox.setFormatter(logging.Formatter('%(message)s'))
         logger = logging.getLogger()
@@ -504,27 +518,27 @@ class BidsDialog(QDialog, QPlainTextEdit):
         stdout_logger = logging.getLogger('STDOUT')
         sl = StreamToLogger(stdout_logger, logging.INFO)
         sys.stdout = sl
-        
+
         # self._button = QPushButton('Test me')
         # self._button.clicked.connect(self.test)
-        
+
         layout = QVBoxLayout()
         layout.addWidget(logTextBox.widget)
         # layout.addWidget(self._button)
         self.setLayout(layout)
-        
+
     # def test(self):
     #     print('damn, a bug')
     #     print('something to remember')
     #     print('that\'s not right')
     #     print('foobar')
-        
+
     def closeEvent(self, event):
         sys.stdout = self.stdout
-        
+
     def close(self):
         sys.stdout = self.stdout
-    
+
 class StreamToLogger(object):
     """
     Fake file-like stream object that redirects writes to a logger instance.
@@ -552,7 +566,7 @@ class StreamToLogger(object):
         if self.linebuf != '':
             self.logger.log(self.log_level, self.linebuf.rstrip())
         self.linebuf = ''
-        
+
 # class MyDialog(QDialog, QPlainTextEdit):
 #     def __init__(self, parent=None):
 #         super().__init__(parent)
@@ -583,11 +597,11 @@ class StreamToLogger(object):
 #         logging.error('foobar')
 
 if __name__ == "__main__":
-        
+
     app = QApplication([])
-    
+
     window = MainWindow()
-    
+
     window.show()
-    
+
     app.exec()
