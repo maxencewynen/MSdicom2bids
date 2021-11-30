@@ -160,7 +160,26 @@ class BIDSHandler:
                                           session,
                                           derivatives,
                                           registrations)
+    
+    @staticmethod
+    def add_dataset_description_jsons(bids_dir):
+        dataset_description = { 
+        	"Name": "", 
+        	"BIDSVersion":  "1.2.2", 
+        	"PipelineDescription": {
+        		"Name": ""
+        	}
+        }
 
+        for subdir,_,_ in os.walk(bids_dir):
+            if subdir.endswith('derivatives'):
+                for d in os.listdir(subdir):
+                    if os.path.isdir(pjoin(subdir,d)):
+                        dataset_description["Name"] = d
+                        dataset_description["PipelineDescription"]["Name"] = d
+                        with open(pjoin(subdir, d, 'dataset_description.json'), 'w') as fp:
+                            json.dump(dataset_description, fp)
+    
     @staticmethod
     def make_directories_from(bids_dir,
                             pat_id=None,
@@ -288,7 +307,8 @@ class BIDSHandler:
                                                   session=session,
                                                   derivatives = all_derivatives,
                                                   registrations = None)
-
+        BIDSHandler.add_dataset_description_jsons(bids_dir)
+        
         return pat_id, session
 
     @staticmethod

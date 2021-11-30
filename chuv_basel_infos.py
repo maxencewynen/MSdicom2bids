@@ -37,7 +37,7 @@ CHUV = \
      
      ('\\derivatives\\mask_predictions_rimnet_v1',          'mask-predictions_rimnet-v1.nii.gz'):       [{'derivatives': 'mask_predictions_rimnet_v1', 'registration': 'T2star', 'new_name': None}],
      
-     ('\\derivatives\\registrations_to_T2star',             'acq-MPRAGE_T1map.nii.gz'):                 [{'derivatives': None, 'registration': 'T2star', 'new_name': 'MPRAGE'}],
+     ('\\derivatives\\registrations_to_T2star',             'acq-MPRAGE_T1map.nii.gz'):                 [{'derivatives': None, 'registration': 'T2star', 'new_name': 'acq-MPRAGE_T1w'}],
      ('\\derivatives\\registrations_to_T2star',             'FLAIR.nii.gz'):                            [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
      
      ('\\derivatives\\rims_annotations',                    'mask.nii.gz'):                             [{'derivatives': 'lesionmasks', 'registration': 'T2star', 'new_name': 'labeled_lesions'}],
@@ -57,11 +57,12 @@ CHUV = \
      
      ('\\anat',                                             'acq-mag_T2star.nii.gz'):                   [{'derivatives': None, 'registration': None, 'new_name': None},
                                                                                                          {'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\anat',                                             'acq-MPRAGE_T1map.nii.gz'):                 [{'derivatives': None, 'registration': None, 'new_name': 'MPRAGE'}, 
-                                                                                                         {'derivatives': None, 'registration': None, 'new_name': 'MPRAGE'}],
+     ('\\anat',                                             'acq-MPRAGE_T1map.nii.gz'):                 [{'derivatives': None, 'registration': None, 'new_name': 'acq-MPRAGE_T1w'}, 
+                                                                                                         {'derivatives': None, 'registration': 'MPRAGE', 'new_name': 'acq-MPRAGE_T1w'}],
      ('\\anat',                                             'acq-phase_T2star.nii.gz'):                 [{'derivatives': None, 'registration': None, 'new_name': None},
                                                                                                          {'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\anat',                                             'acq-star_FLAIR.nii.gz'):                   [{'derivatives': 'acq-star_FLAIR', 'registration': 'T2star', 'new_name': None}],
+     ('\\anat',                                             'acq-star_FLAIR.nii.gz'):                   [{'derivatives': 'acq-star_FLAIR', 'registration': None, 'new_name': None},
+                                                                                                         {'derivatives': 'acq-star_FLAIR', 'registration': 'T2star', 'new_name': None}],
      ('\\anat',                                             'FLAIR.json'):                              [{'derivatives': None, 'registration': None, 'new_name': None},
                                                                                                          {'derivatives': None, 'registration': 'FLAIR', 'new_name': None}],
      ('\\anat',                                             'FLAIR.nii.gz'):                            [{'derivatives': None, 'registration': None, 'new_name': None},
@@ -108,19 +109,19 @@ BASEL = \
      #
      ('\\derivatives\\expert_annotations',                  'expertsannotations.nii.gz'):               [{'derivatives': 'lesionmasks', 'registration': 'T2star', 'new_name': "prl-2d_lesions"}],
      
-     ('\\derivatives\\freesurfer_segmentation',             'segmentation.nii.gz'):                     [{'derivatives': None, 'registration': 'MP2RAGE', 'new_name': 'brain-labeled'}],
+     ('\\derivatives\\freesurfer_segmentation',             'segmentation.nii.gz'):                     [{'derivatives': 'freesurfer_segmentation', 'registration': 'MP2RAGE', 'new_name': 'brain-labeled'}],
      ('\\derivatives\\freesurfer_segmentation',             'segmentationFS.mgz'):                      None,
-     ('\\derivatives\\freesurfer_segmentation',             'segmentationREG.nii.gz'):                  [{'derivatives': None, 'registration': 'T2star', 'new_name': 'brain-labeled'}],
-     ('\\derivatives\\freesurfer_segmentation',             'segmentationREG_MS.nii.gz'):               [{'derivatives': None, 'registration': 'T2star', 'new_name': 'brain-labeled_dilated'}],
+     ('\\derivatives\\freesurfer_segmentation',             'segmentationREG.nii.gz'):                  [{'derivatives': 'freesurfer_segmentation', 'registration': 'T2star', 'new_name': 'brain-labeled'}],
+     ('\\derivatives\\freesurfer_segmentation',             'segmentationREG_MS.nii.gz'):               [{'derivatives': 'freesurfer_segmentation', 'registration': 'T2star', 'new_name': 'brain-labeled_dilated'}],
      
-     ('\\derivatives\\lesions_34_34_34',                    'json'):                                    [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'acq-mag_T2star.dat'):                      [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'acq-MP2RAGEuni_T1map.dat'):                [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'acq-MP2RAGE_T1map.dat'):                   [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'acq-phase_T2star.dat'):                    [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'acq-star_FLAIR.dat'):                      [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'FLAIR.dat'):                               [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
-     ('\\derivatives\\lesions_34_34_34',                    'mask.dat'):                                [{'derivatives': None, 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'json'):                                    [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'acq-mag_T2star.dat'):                      [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'acq-MP2RAGEuni_T1map.dat'):                [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'acq-MP2RAGE_T1map.dat'):                   [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'acq-phase_T2star.dat'):                    [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'acq-star_FLAIR.dat'):                      [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'FLAIR.dat'):                               [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
+     ('\\derivatives\\lesions_34_34_34',                    'mask.dat'):                                [{'derivatives': 'lesions_34_34_34', 'registration': 'T2star', 'new_name': None}],
      
      ('\\derivatives\\registrations_to_T2star',             'acq-MP2RAGEuni_T1map.nii.gz'):             [{'derivatives': 'MP2RAGE', 'registration': 'MP2RAGE', 'new_name': 'UNIT1'}],
      ('\\derivatives\\registrations_to_T2star',             'acq-MP2RAGE_T1map.nii.gz'):                [{'derivatives': 'MP2RAGE', 'registration': 'MP2RAGE', 'new_name': 'T1map'}],
@@ -130,8 +131,8 @@ BASEL = \
      
      ('\\derivatives\\segmentations',                       'segmentation.nii.gz'):                     [{'derivatives': 'lesionmasks', 'registration': 'T2star', 'new_name': "binary_lesions"}],
      # lesion probability maps
-     ('\\derivatives\\segmentation_probability_maps',       'probabilitiesmap.nii.gz'):                 [{'derivatives': None, 'registration': 'MP2RAGE', 'new_name': "probability_lesions"}],
-     ('\\derivatives\\segmentation_probability_maps',       'probabilitiesmapREG.nii.gz'):              [{'derivatives': None, 'registration': 'T2star', 'new_name': "probability_lesions"}],
+     ('\\derivatives\\segmentation_probability_maps',       'probabilitiesmap.nii.gz'):                 [{'derivatives': 'lesionmasks', 'registration': 'MP2RAGE', 'new_name': "probability_lesions"}],
+     ('\\derivatives\\segmentation_probability_maps',       'probabilitiesmapREG.nii.gz'):              [{'derivatives': 'lesionmasks', 'registration': 'T2star', 'new_name': "probability_lesions"}],
      
      ('\\derivatives\\synthetic_mp2rage',                   'brainmaskREG.nii.gz'):                     None,
      
