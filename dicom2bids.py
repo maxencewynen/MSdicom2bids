@@ -164,12 +164,15 @@ class BIDSHandler:
     @staticmethod
     def add_dataset_description_jsons(bids_dir):
         dataset_description = { 
-        	"Name": "", 
+        	"Name": "dataset", 
         	"BIDSVersion":  "1.2.2", 
         	"PipelineDescription": {
-        		"Name": ""
+        		"Name": "dataset"
         	}
         }
+        with open(pjoin(bids_dir, 'dataset_description.json'), 'w') as fp:
+            json.dump(dataset_description, fp)
+        
 
         for subdir,_,_ in os.walk(bids_dir):
             if subdir.endswith('derivatives'):
@@ -307,7 +310,13 @@ class BIDSHandler:
                                                   session=session,
                                                   derivatives = all_derivatives,
                                                   registrations = None)
-        BIDSHandler.add_dataset_description_jsons(bids_dir)
+        
+        BIDSHandler.add_dataset_description_jsons(bids_dir)        
+        
+        if not pexists(pjoin(bids_dir, "README")):
+            from shutil import copy as shcopy
+            shcopy(pjoin(os.path.dirname(__file__),"readme_example"), 
+                   pjoin(bids_dir, "README"))
         
         return pat_id, session
 
