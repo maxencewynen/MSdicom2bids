@@ -40,12 +40,20 @@ class BIDSHandler:
     @staticmethod
     def rename(series, filenames, path):
         if 'MPRAGE' in series or '3DT1' in series:
+            if "ORIG" in series.upper():
+                return ["run-orig_MPRAGE"]
             return ["MPRAGE"]
         if 'FLAIR' in series.upper(): # ORIG ???
+            if "ORIG" in series.upper():
+                return ["run-orig_FLAIR"]
             return ["FLAIR"]
         if 'phase' in series or ("SWI_EPI" in series and "_ph" in series):
+            if "ORIG" in series.upper():
+                return ["run-orig_acq-phase_T2star"]
             return ["acq-phase_T2star"]
         if '3D EPI' in series or "SWI_EPI" in series:
+            if "ORIG" in series.upper():
+                return ["run-orig_acq-mag_T2star"]
             return ["acq-mag_T2star"]
         if 'Opt_DTI' in series or 'DWI' in series:
             if len(filenames)>1:
