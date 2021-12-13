@@ -14,19 +14,7 @@ import zipfile
 
 dicom2niix_path = "dcm2niix"
 
-list_dicoms = ["/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/OMBELETS03-11-21.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Otten_24-Aug-2021.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/OUAAZIZI-08FEB2021.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/QUERTAIN.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/RAMPLOT160421.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/ROSE-L47612W.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/SEMANA05-10-21.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/SOREL04-11-21.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/STAMATOPOULOS-05-mars-2021.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Tainttinger_19-03-21.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/THYS250521.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Van-varenberg_23_03_21.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/VENTURI29-10-2021.zip",
+list_dicoms = ["/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/VENTURI29-10-2021",
 "/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/VERBEKE090721.zip",
 "/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Wantier_19-03-21.zip",
 "/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/WUYTENS300321.zip"]

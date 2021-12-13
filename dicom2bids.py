@@ -16,11 +16,12 @@ import shutil
 from os.path import join as pjoin
 from os.path import exists as pexists
 import pandas as pd
-
 from pydicom import dcmread
+import logging
+import sys
 
 class BIDSHandler:
-    def __init__(self, root_dir, dicom2niix_path="dcm2niix"):
+    def __init__(self, root_dir, dicom2niix_path="dcm2niix", logger=None):
         self.root_dir = root_dir
 
         self.IGNORED_SERIES = ['3Plane_Loc_SSFSE',
@@ -36,6 +37,16 @@ class BIDSHandler:
             if d.find('sub-') == 0:
                 all_subj_dir.append(d)
         self.number_of_subjects = len(all_subj_dir)
+        
+        logging.root.handlers = []
+        logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
+        self.logger = logging.getLogger()
+        
+    def addLoggerHandler(self, logger_handler):
+        self.logger.addHandler(logger_handler)
+
+    def setDicom2niixPath(self, dcm2niix_path):
+        self.dicom2niix_path = dcm2niix_path
 
     @staticmethod
     def rename(series, filenames, path):
@@ -114,17 +125,17 @@ class BIDSHandler:
 
         """
         directory = pjoin(directory)
-        print("[INFO] Starting to convert ...")
+        logging.info("[INFO] Starting to convert ...")
 
         all_sequences = []
         for subdir, dirs, files in os.walk(directory):
             if len(dirs) !=0 or len(files)< 10:
                 continue
-            print(f"SUBDIR: {subdir}\tDIRS: {dirs}")#\nFILES: {files}\n")
+            logging.info(f"SUBDIR: {subdir}\tDIRS: {dirs}")#\nFILES: {files}\n")
             path = os.path.normpath(subdir)
             if convert:
-                # print("\n\n>>> CALLED <<<")
-                # print(' '.join(["dicom2niix", '-f', "\"%f_%p_%t_%s\"", "-p",
+                # logging.info("\n\n>>> CALLED <<<")
+                # logging.info(' '.join(["dicom2niix", '-f', "\"%f_%p_%t_%s\"", "-p",
                 #                  "y", "-z", "y", path]))
                 subprocess.call([self.dicom2niix_path, '-f', "\"%f_%p_%t_%s\"",
                                   "-p", "y", "-z", "y", path])
@@ -132,8 +143,8 @@ class BIDSHandler:
             all_sequences.append((path, descr))
         all_sequences = [(x[0].replace('\\', '/'),x[1]) for x in all_sequences]
 
-        print("[INFO] Converted dicom files to", end =" ")
-        print(f"{BIDSHandler.bold(str(len(all_sequences)))} compressed nifti")
+        logging.info("[INFO] Converted dicom files to")
+        logging.info(f"{BIDSHandler.bold(str(len(all_sequences)))} compressed nifti")
         return all_sequences
 
     @staticmethod
@@ -333,8 +344,8 @@ class BIDSHandler:
         if pexists(dirpath):
             rmtree(dirpath)
         else:
-            print("[Exception] Cannot remove directory that does not exists:")
-            print(f"\t{dirpath}")
+            logging.info("[Exception] Cannot remove directory that does not exists:")
+            logging.info(f"\t{dirpath}")
 
     def delete_subject(self, pat_id, delete_sourcedata=False):
         bids_dir = self.root_dir
@@ -363,11 +374,11 @@ class BIDSHandler:
     def rename_and_move_nifti(self, dicom_series, pat_id, session='01'):
 
         def move_all(path, filename, file_extensions, dest_dir, new_filename):
-            print(filename)
+            logging.info(filename)
             for file_extension in file_extensions:
                 if pexists(pjoin(path, f"{filename}.{file_extension}")):
                     if pexists(pjoin(dest_dir, f"{new_filename}.{file_extension}")):
-                        print('File already existing in dest dir', pjoin(dest_dir, f"{new_filename}.{file_extension}"))
+                        logging.info(f'File already existing in dest dir {pjoin(dest_dir, f"{new_filename}.{file_extension}")}')
                         ext = 'a'
                         for i in range(26):
                             if not pexists(pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}")):
@@ -399,10 +410,10 @@ class BIDSHandler:
                 new_names = self.rename(file.replace(".nii.gz", ""),
                                         [file.replace(".nii.gz", "")],
                                         path)
-                print(new_names)
+                logging.info(new_names)
                 if new_names is None:
-                    print(f"DICOM series not recognized: {file.replace('.nii.gz','')}")
-                    print(f"Path: {path}")
+                    logging.info(f"DICOM series not recognized: {file.replace('.nii.gz','')}")
+                    logging.info(f"Path: {path}")
                     new_names = [file.replace(".nii.gz", "")]
 
                 for filename, new_name in zip([file.replace(".nii.gz", "")],
@@ -448,7 +459,7 @@ class BIDSHandler:
 
             new_names = BIDSHandler.rename(series, nifti_filenames, path)
             if new_names is None:
-                print(f"DICOM series not recognized: {series}\nPath: {path}")
+                logging.info(f"DICOM series not recognized: {series}\nPath: {path}")
                 new_names = nifti_filenames
             for filename, new_name in zip(nifti_filenames, new_names):
                 dos = 'dwi' if new_name == 'DWI' else 'anat'
@@ -472,8 +483,8 @@ class BIDSHandler:
                                   f"ses-{session}", dos),
                             f"sub-{pat_id}_ses-{session}_{new_name}")
 
-            print(f"SERIES: {series}\n   Filenames: {nifti_filenames}\n", end = "")
-            print(f"   RENAME: {BIDSHandler.rename(series, nifti_filenames, path)}\n\n")
+            logging.info(f"SERIES: {series}\n   Filenames: {nifti_filenames}\n")
+            logging.info(f"   RENAME: {BIDSHandler.rename(series, nifti_filenames, path)}\n\n")
 
 
 
@@ -518,10 +529,10 @@ class BIDSHandler:
             len(os.listdir(pjoin(sourcedata, f"sub-{pat_id}",
                                        f"ses-{session}"))) > 0:
 
-            print("[ERROR] Error while trying to copy the dicom folder into")
-            print(f"sourcedata folder: sourcedata/sub-{pat_id}/ses-{session}")
-            print("already exists and is not empty.")
-            print(" Please remove this directory and try again.")
+            logging.error("[ERROR] Error while trying to copy the dicom folder into")
+            logging.info(f"sourcedata folder: sourcedata/sub-{pat_id}/ses-{session}")
+            logging.info("already exists and is not empty.")
+            logging.info(" Please remove this directory and try again.")
             return
 
 
@@ -530,7 +541,7 @@ class BIDSHandler:
         self.mkdir_if_not_exists(pjoin(sourcedata, f"sub-{pat_id}",
                                        f"ses-{session}"))
 
-        print("[INFO] Copying dicom folder to sourcedata ...")
+        logging.info("[INFO] Copying dicom folder to sourcedata ...")
         shutil.copytree(dicomfolder, pjoin(sourcedata, f"sub-{pat_id}",
                                        f"ses-{session}", "DICOM"))
 
@@ -566,7 +577,7 @@ class BIDSHandler:
 
 
     def separate_dicoms(self, src, sub, ses):
-        print('[INFO] Sorting dicoms ...')
+        logging.info('[INFO] Sorting dicoms ...')
         def clean_text(string):
             # clean and standardize text descriptions, which makes searching files easier
             forbidden_symbols = ["*", ".", ",", "\"", "\\", "/", "|", "[", "]", ":", ";", " "]
@@ -578,7 +589,7 @@ class BIDSHandler:
 
         dst = f"{self.root_dir}/sourcedata/sub-{sub}/ses-{ses}/DICOM/sorted"
 
-        print('reading file list...')
+        logging.info('reading file list...')
         unsortedList = []
         corresponding_root = []
         for root, dirs, files in os.walk(src):
@@ -587,7 +598,7 @@ class BIDSHandler:
                     unsortedList.append(os.path.join(root, file))
                     corresponding_root.append(root)
 
-        print('%s files found.' % len(unsortedList))
+        logging.info('%s files found.' % len(unsortedList))
 
         pat_name = None
         pat_date = None
@@ -638,14 +649,14 @@ class BIDSHandler:
 
             ds.save_as(os.path.join(dst, scanning_sequence, fileName))
 
-        print('done.')
+        logging.info('done.')
 
         return pat_name, pat_date
 
     def anonymisation(self, pat_name, pat_date, pat_id, pat_ses):
 
-        if pexists(pjoin(self.root_dir, "anonymisation.csv")):
-            anonym = pd.read_csv(pjoin(self.root_dir, "anonymisation.csv")).to_dict()
+        if pexists(pjoin(self.root_dir, "participants.tsv")):
+            anonym = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
         else:
             anonym = {'PatientName':{}, 'Bids_ID':{}, 'Date ses-01':{}}
 
@@ -665,9 +676,9 @@ class BIDSHandler:
 
         # Save anonym dic to csv
         anonym_df = pd.DataFrame(anonym)
-        anonym_df.to_csv(pjoin(self.root_dir, "anonymisation.csv"), index=False)
+        anonym_df.to_csv(pjoin(self.root_dir, "participants.tsv"), index=False, sep='\t')
 
-        print('[INFO] Anonymisation done')
+        logging.info('[INFO] Anonymisation done')
 
 
 if __name__ == '__main__':
@@ -685,6 +696,6 @@ if __name__ == '__main__':
     #                                                                    session     = SESSION,
     #                                                                    return_dicom_series=True)
 
-    # print("[INFO] Done")
+    # logging.info("[INFO] Done")
 
 

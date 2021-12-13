@@ -12,13 +12,27 @@ import os
 from dicom2bids import *
 import logging
 from PyQt5.QtCore import QSize, Qt, QModelIndex
-from PyQt5.QtWidgets import QDesktopWidget, QApplication, QWidget, QPushButton, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QTreeView, QFileSystemModel, QGridLayout, QPlainTextEdit, QMessageBox, QListWidget, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QDesktopWidget, QApplication, QWidget, QPushButton, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QTreeView, QFileSystemModel, QGridLayout, QPlainTextEdit, QMessageBox, QListWidget, QTableWidget, QTableWidgetItem, QMenu
 from PyQt5.QtGui import QFont
 import traceback
+import threading
+import subprocess
+import pandas as pd
+import platform
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.memory = {}
+        try:
+            memory_df = pd.read_pickle('memory.xz')
+            self.memory = memory_df.to_dict()
+            for key in self.memory.keys():
+                self.memory[key] = self.memory[key][0]
+        except FileNotFoundError: 
+            print('test')
+            pass          
+        self.system = platform.system()
         self.init_ui()
 
     def init_ui(self):
@@ -31,7 +45,7 @@ class MainWindow(QMainWindow):
         while self.bids_dir=="":
             self.bids_dir = str(QFileDialog.getExistingDirectory(self, "Please, select BIDS Directory"))
 
-        self.dcm2niix_path = None if os.name == 'nt' else "dcm2niix"
+        self.dcm2niix_path = self.memory.get('dcm2niix_path')
 
         self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path=self.dcm2niix_path)
         bids_dir_split = self.bids_dir.split('/')
@@ -65,10 +79,11 @@ class MainWindow(QMainWindow):
         self.move(qr.topLeft())
 
     def closeEvent(self, event):
-        sys.stdout = self.bids_dialog.stdout
+        memory_df = pd.DataFrame(self.memory, index=[0])
+        memory_df.to_pickle('memory.xz')
 
     def update_bids(self):
-        print("update_bids!")
+        logging.info("update_bids!")
         # bids_dir_split = self.bids.root_dir.split('/')
         # self.bids_name = bids_dir_split[len(bids_dir_split)-1]
         # self.bids_lab.setText(self.bids_name)
@@ -129,10 +144,10 @@ class MainWindow(QMainWindow):
 #         self.move(cp)
 
 #     def browse(self):
-#         print('Browse')
+#         logging.info('Browse')
 #         self.folderpath = QFileDialog.getExistingDirectory(self, 'Select Folder')
 
-#         print(self.folderpath)
+#         logging.info(self.folderpath)
 
 class BidsDirView(QWidget):
 
@@ -151,7 +166,10 @@ class BidsDirView(QWidget):
         self.tree.setColumnWidth(0,250)
         self.tree.setAlternatingRowColors(True)
         self.tree.doubleClicked.connect(self.treeMedia_doubleClicked)
-        # self.tree.rightClicked.connect(self.treeMedia_rightClicked)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.openMenu)
+        
+        self.itksnap = None
 
         layout = QVBoxLayout()
         layout.addWidget(self.tree)
@@ -167,24 +185,61 @@ class BidsDirView(QWidget):
         item = self.tree.selectedIndexes()[0]
         item_path = item.model().filePath(index)
         if os.path.isfile(item_path):
-            print(f"[INFO] Opening {item_path}")
+            logging.info(f"[INFO] Opening {item_path}")
             if '.nii' in item_path:
-                os.system(f"itksnap -g {item_path}")
+                self.itksnap = self.parent.memory.get('itksnap')
+                if self.itksnap == None:
+                    logging.info(f'No application selected open MRI \n \t Please select itksnap path')
+                else:
+                    print(self.itksnap)
+                    subprocess.call([self.itksnap, '-g', f"{item_path}"])
             else:
-                os.system(f"xdg-open {item_path}")
+                if self.parent.system == 'Linux':
+                    subprocess.call(['xdg-open', f"{item_path}"])
+                elif self.parent.system == 'Darwin':
+                    subprocess.call(['open', f"{item_path}"])
+                elif self.parent.system == 'Windows':
+                    subprocess.call(['start', f"{item_path}"])
+                else:
+                    logging.warning('The program does not recognize the OS')
         else:
             pass
 
-    # def treeMedia_rightClicked(self, index):
-    #     item = self.tree.selectedIndexes()[0]
-    #     print(item.model().filePath(index))
-    #     item_path = item.model().filePath(index)
-    #     if os.path.isfile(item_path):
-    #         print("rC: file")
-    #     else:
-    #         print("rC: folder")
-    #         pass
-
+    def openMenu(self, position):
+        menu = QMenu()
+        openWith = menu.addAction('Open with')
+        openAdd = 'None'
+        openSeg = 'None'
+        index = self.tree.indexAt(position)
+        item = self.tree.selectedIndexes()[0]
+        item_path = item.model().filePath(index)
+        if '.nii' in item_path:
+            if self.itksnap == None:
+                self.itksnap = self.parent.memory.get('itksnap')
+            if self.itksnap != None:
+                openAdd = menu.addAction('Open as additional image')
+                openSeg = menu.addAction('Open as segmentation')
+        action = menu.exec_(self.tree.viewport().mapToGlobal(position))
+        
+        if action == openWith:
+            logging.debug('Open With')
+            self.itksnap = QFileDialog.getOpenFileName(self, "Select the path to itksnap")[0]
+            if self.itksnap != None and self.itksnap != '':
+                subprocess.call([self.itksnap, '-g', item_path])
+                self.parent.memory['itksnap'] = self.itksnap
+            else:
+                logging.info(f'No application selected open MRI \n \t Please select itksnap path')
+               
+        if action == openAdd:
+            logging.debug('Open as additional image')
+            subprocess.call([self.itksnap, '-o', item_path])
+            
+        if action == openSeg:
+            logging.debug('Open as segmentation')
+            subprocess.call([self.itksnap, '-s', item_path])
+        
+        
+        
 # class BidsDirView(QWidget):
 
 #     def __init__(self, dir_path):
@@ -257,7 +312,7 @@ class BidsActions(QWidget):
         self.setLayout(layout)
 
     def change_bids_dir(self):
-        print("change_bids_dir")
+        logging.info("change_bids_dir")
         # bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
         # if os.path.isdir(bids_dir):
         #     self.bids = BIDSHandler(root_dir=bids_dir, dicom2niix_path="dcm2niix")
@@ -266,26 +321,28 @@ class BidsActions(QWidget):
         self.parent.update_bids()
 
     def add(self):
-        print("add")
+        logging.info("add")
         self.add_win = AddWindow(self)
         if not self.parent.dcm2niix_path:
             # ajouter une fenetre
             path = QFileDialog.getOpenFileName(self, "Select 'dcm2niix.exe' path")[0]
             self.parent.dcm2niix_path = path
+            self.parent.memory['dcm2niix_path'] = path
+            self.bids.setDicom2niixPath(self.parent.dcm2niix_path)
         self.add_win.show()
 
     def remove(self):
-        print("remove")
+        logging.info("remove")
         self.rm_win = RemoveWindow(self)
         self.rm_win.show()
 
     def rename_sub(self):
-        print("rename_sub")
+        logging.info("rename_sub")
         self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
 
     def rename_ses(self):
-        print("rename_ses")
+        logging.info("rename_ses")
 
     def update_bids(self, parent):
         self.parent = parent
@@ -326,7 +383,7 @@ class RemoveWindow(QMainWindow):
     def remove(self):
         subject = self.subject.text()
         session = self.session.text()
-        print(f"Removing sub-{subject} ses-{session}")
+        logging.info(f"Removing sub-{subject} ses-{session}")
         if subject != "":
             if session != "":
                 self.bids.delete_session(subject, session)
@@ -398,7 +455,7 @@ class AddWindow(QMainWindow):
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
         self.list_view.setItem(rowPosition , 1, QTableWidgetItem(subject))
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
-        self.list_to_add.append((dicom_folder, subject, session))
+        # self.list_to_add.append((dicom_folder, subject, session))
 
 
     def add_files(self):
@@ -414,9 +471,13 @@ class AddWindow(QMainWindow):
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
         self.list_view.setItem(rowPosition , 1, QTableWidgetItem(subject))
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
-        self.list_to_add.append((dicom_folder, subject, session))
+        # self.list_to_add.append((dicom_folder, subject, session))        
 
     def add(self):
+        #get items
+        for i in range(self.list_view.rowCount()):
+            self.list_to_add.append((self.list_view.item(i,0).text(), self.list_view.item(i,1).text() if self.list_view.item(i,1).text() != '' else None, self.list_view.item(i,2).text() if self.list_view.item(i,2).text() != '' else None))
+        
         for item in self.list_to_add:
 
             dicom = item[0]
@@ -436,15 +497,15 @@ class AddWindow(QMainWindow):
                                                                                 pat_id      = PATIENT_ID,
                                                                                 session     = SESSION,
                                                                                 return_dicom_series=True)
-                print(f"[INFO] done for patient {pat_id}")
+                logging.info(f"[INFO] done for patient {pat_id}")
             except:
-                print(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}:')
+                logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}:')
                 # exc_type, exc_obj, exc_tb = sys.exc_info()
                 # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                # print(exc_type, fname, exc_tb.tb_lineno)
-                traceback.print_exc()
-        print("[INFO] All done.")
-
+                # logging.info(exc_type, fname, exc_tb.tb_lineno)
+                traceback.logging.info_exc()
+        logging.info("[INFO] All done.")
+        
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
@@ -482,7 +543,7 @@ class RenameSubject(QMainWindow):
         new_sub = self.new_sub.text()
 
         self.bids.rename_subject(old_sub, new_sub)
-        print(f"sub-{old_sub} renamed to sub-{new_sub}")
+        logging.info(f"sub-{old_sub} renamed to sub-{new_sub}")
 
     def center(self):
         qr = self.frameGeometry()
@@ -510,14 +571,14 @@ class BidsDialog(QDialog, QPlainTextEdit):
         self.setMinimumSize(700,300)
 
         logTextBox = QTextEditLogger(self)
-        logTextBox.setFormatter(logging.Formatter('%(message)s'))
-        logger = logging.getLogger()
-        logger.addHandler(logTextBox)
-        logger.setLevel(logging.DEBUG)
-        self.stdout = sys.stdout
-        stdout_logger = logging.getLogger('STDOUT')
-        sl = StreamToLogger(stdout_logger, logging.INFO)
-        sys.stdout = sl
+        logTextBox.setFormatter(logging.Formatter('[%(levelname)s] - %(message)s'))
+        self.parent.bids.addLoggerHandler(logTextBox)
+        # logger.addHandler(logTextBox)
+        # logger.setLevel(logging.DEBUG)
+        # self.stdout = sys.stdout
+        # stdout_logger = logging.getLogger('STDOUT')
+        # sl = StreamToLogger(stdout_logger, logging.INFO)
+        # sys.stdout = sl
 
         # self._button = QPushButton('Test me')
         # self._button.clicked.connect(self.test)
@@ -528,16 +589,16 @@ class BidsDialog(QDialog, QPlainTextEdit):
         self.setLayout(layout)
 
     # def test(self):
-    #     print('damn, a bug')
-    #     print('something to remember')
-    #     print('that\'s not right')
-    #     print('foobar')
+    #     logging.info('damn, a bug')
+    #     logging.info('something to remember')
+    #     logging.info('that\'s not right')
+    #     logging.info('foobar')
 
-    def closeEvent(self, event):
-        sys.stdout = self.stdout
+    # def closeEvent(self, event):
+    #     sys.stdout = self.stdout
 
-    def close(self):
-        sys.stdout = self.stdout
+    # def close(self):
+    #     sys.stdout = self.stdout
 
 class StreamToLogger(object):
     """
@@ -572,7 +633,7 @@ class StreamToLogger(object):
 #         super().__init__(parent)
 
 #         logTextBox = QTextEditLogger(self)
-#         # You can format what is printed to text box
+#         # You can format what is logging.infoed to text box
 #         logTextBox.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 #         logging.getLogger().addHandler(logTextBox)
 #         # You can control the logging level
