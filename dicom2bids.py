@@ -42,6 +42,11 @@ class BIDSHandler:
         logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
         self.logger = logging.getLogger()
         
+        self.sequences_df = pd.read_csv('sequences.csv')
+        self.sequences_df.fillna('', inplace=True)
+        
+        self.wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
+        
     def addLoggerHandler(self, logger_handler):
         self.logger.addHandler(logger_handler)
 
@@ -139,8 +144,12 @@ class BIDSHandler:
                 #                  "y", "-z", "y", path]))
                 subprocess.call([self.dicom2niix_path, '-f', "\"%f_%p_%t_%s\"",
                                   "-p", "y", "-z", "y", path])
-            descr = dcmread(f"{path}/{files[0]}").SeriesDescription
-            all_sequences.append((path, descr))
+            # if "." not in files[0] or not any([ext in file for ext in wrong_extensions]):
+            #     descr = dcmread(f"{path}/{files[0]}").SeriesDescription
+            for _,_,files in os.walk(path):
+                for file in files:
+                    if '.nii.gz' in file:
+                        all_sequences.append((path, file.replace('.nii.gz', '')))
         all_sequences = [(x[0].replace('\\', '/'),x[1]) for x in all_sequences]
 
         logging.info("[INFO] Converted dicom files to")
@@ -157,28 +166,31 @@ class BIDSHandler:
             BIDSHandler.mkdir_if_not_exists(pjoin(root_dir, dirname))
 
 
-    def make_directories(self, pat_id=None, session=None,
-                         derivatives = ['samseg',
-                                           'stats',
-                                           'segmentations',
-                                           'QSM',
-                                           'MP2RAGE',
-                                           'acq-star_FLAIR',
-                                           'acq-phase_T2star',
-                                           'skullstripped'],
-                        registrations = ['T2star',
-                                         'FLAIR',
-                                         'MPRAGE',
-                                         'MP2RAGE',
-                                         'dwi',
-                                         'T1',
-                                         'T2',
-                                         'ce-gado_T1w']):
-        return self.make_directories_from(self.root_dir,
-                                          pat_id,
-                                          session,
-                                          derivatives,
-                                          registrations)
+    # def make_directories(self, pat_id=None, session=None,
+    #                      derivatives = ['samseg',
+    #                                        'stats',
+    #                                        'segmentations',
+    #                                        'QSM',
+    #                                        'MP2RAGE',
+    #                                        'acq-star_FLAIR',
+    #                                        'acq-phase_T2star',
+    #                                        'skullstripped'],
+    #                     registrations = ['T2star',
+    #                                      'FLAIR',
+    #                                      'MPRAGE',
+    #                                      'MP2RAGE',
+    #                                      'dwi',
+    #                                      'T1',
+    #                                      'T2',
+    #                                      'ce-gado_T1w']):
+    #     return self.make_directories_from(self.root_dir,
+    #                                       pat_id,
+    #                                       session,
+    #                                       derivatives,
+    #                                       registrations)
+    
+    def make_directories(self, pat_id=None, session=None):
+        return self.make_directories_from(self.root_dir, pat_id, session)
     
     @staticmethod
     def add_dataset_description_jsons(bids_dir):
@@ -202,33 +214,147 @@ class BIDSHandler:
                         with open(pjoin(subdir, d, 'dataset_description.json'), 'w') as fp:
                             json.dump(dataset_description, fp)
     
-    @staticmethod
-    def make_directories_from(bids_dir,
-                            pat_id=None,
-                            session=None,
-                            derivatives = ['samseg',
-                                           'stats',
-                                           'segmentations',
-                                           'QSM',
-                                           'MP2RAGE',
-                                           'acq-star_FLAIR',
-                                           'skullstripped'],
-                            registrations = ['T2star',
-                                             'FLAIR',
-                                             'MPRAGE',
-                                             'MP2RAGE',
-                                             'dwi',
-                                             'T1',
-                                             'T2',
-                                             'ce-gado_T1w']):
+    # @staticmethod
+    # def make_directories_from(bids_dir,
+    #                         pat_id=None,
+    #                         session=None,
+    #                         derivatives = ['samseg',
+    #                                        'stats',
+    #                                        'segmentations',
+    #                                        'QSM',
+    #                                        'MP2RAGE',
+    #                                        'acq-star_FLAIR',
+    #                                        'skullstripped'],
+    #                         registrations = ['T2star',
+    #                                          'FLAIR',
+    #                                          'MPRAGE',
+    #                                          'MP2RAGE',
+    #                                          'dwi',
+    #                                          'T1',
+    #                                          'T2',
+    #                                          'ce-gado_T1w']):
 
-        if registrations is None:
-            BIDSHandler.mkdirs_if_not_exist(bids_dir,
-                                            directories=["derivatives"])
-        else:
-            BIDSHandler.mkdirs_if_not_exist(bids_dir,
-                                            directories=["sourcedata",
-                                                         "derivatives"])
+    #     if registrations is None:
+    #         BIDSHandler.mkdirs_if_not_exist(bids_dir,
+    #                                         directories=["derivatives"])
+    #     else:
+    #         BIDSHandler.mkdirs_if_not_exist(bids_dir,
+    #                                         directories=["sourcedata",
+    #                                                      "derivatives"])
+
+    #     define_pat_id = pat_id is None
+
+    #     # Assign a database ID to the patient
+    #     if define_pat_id:
+    #         all_directories = [x for x in next(os.walk(bids_dir))[1]]
+    #         all_subj_dir = []
+    #         for d in all_directories:
+    #             if d.find('sub-') == 0:
+    #                 all_subj_dir.append(d)
+
+    #         if all_subj_dir == []:
+    #             pat_id = "001"
+    #         else:
+    #             subjects = [int(x.split('-')[1]) for x in all_subj_dir]
+    #             pat_id = str((max(subjects) + 1)).zfill(3)
+
+    #     subj_dir = pjoin(bids_dir,f"sub-{pat_id}")
+    #     BIDSHandler.mkdir_if_not_exists(subj_dir)
+
+    #     if session is None:
+    #         all_directories = [x for x in next(os.walk(subj_dir))[1]]
+    #         all_ses_dir = []
+    #         for d in all_directories:
+    #             if d.find('ses-') == 0:
+    #                 all_ses_dir.append(d)
+    #         if define_pat_id:
+    #             session = "01"
+    #         else:
+    #             sessions = [int(x.split('-')[1]) for x in all_ses_dir]
+    #             if len(sessions) == 0:
+    #                 session = '01'
+    #             else:
+    #                 session = str(max(sessions) + 1).zfill(2)
+
+    #     if registrations is not None:
+    #         BIDSHandler.mkdir_if_not_exists(pjoin(bids_dir, 'sourcedata',
+    #                                               f'sub-{pat_id}'))
+    #         BIDSHandler.mkdir_if_not_exists(pjoin(bids_dir, 'sourcedata',
+    #                                               f'sub-{pat_id}',
+    #                                               f'ses-{session}'))
+
+    #     BIDSHandler.mkdir_if_not_exists(pjoin(subj_dir, f'ses-{session}'))
+    #     BIDSHandler.mkdir_if_not_exists(pjoin(subj_dir, f'ses-{session}', 'anat'))
+    #     BIDSHandler.mkdir_if_not_exists(pjoin(subj_dir, f'ses-{session}', 'dwi'))
+
+    #     deriv = pjoin(bids_dir, 'derivatives')
+
+    #     def add_derivatives_dirs(derivative):
+    #         BIDSHandler.mkdir_if_not_exists(pjoin(deriv, derivative, f'sub-{pat_id}'))
+    #         BIDSHandler.mkdir_if_not_exists(pjoin(deriv, derivative,
+    #                                               f'sub-{pat_id}', f'ses-{session}'))
+
+
+    #     all_derivatives = [x for x in next(os.walk(deriv))[1]]
+
+    #     if derivatives is None:
+    #         derivatives = []
+
+    #     if registrations is None:
+    #         all_derivatives.append("transformation_matrices")
+    #         all_derivatives.append("lesionmasks")
+
+    #     all_derivatives = list(set().union(all_derivatives, derivatives))
+
+    #     BIDSHandler.mkdirs_if_not_exist(deriv, all_derivatives)
+    #     if registrations is not None:
+    #         BIDSHandler.mkdir_if_not_exists(pjoin(deriv, 'registrations'))
+
+    #     if "registrations" in all_derivatives:
+    #         all_derivatives.remove("registrations")
+
+    #     for derivative in all_derivatives:
+    #         add_derivatives_dirs(derivative)
+
+
+    #     if not registrations is None:
+    #         for registration in registrations:
+    #             reg_path = pjoin(deriv, 'registrations',
+    #                              "registrations_to_" + registration)
+    #             BIDSHandler.mkdir_if_not_exists(reg_path)
+
+    #             BIDSHandler.make_directories_from(reg_path,
+    #                                               pat_id=pat_id,
+    #                                               session=session,
+    #                                               derivatives = all_derivatives,
+    #                                               registrations = None)
+
+
+    #             if registration != 'T2star': continue
+
+    #             reg_path = pjoin(deriv, 'registrations',
+    #                          f"registrations_to_{registration}_ses-01")
+    #             BIDSHandler.mkdir_if_not_exists(reg_path)
+
+    #             BIDSHandler.make_directories_from(reg_path,
+    #                                               pat_id=pat_id,
+    #                                               session=session,
+    #                                               derivatives = all_derivatives,
+    #                                               registrations = None)
+        
+    #     BIDSHandler.add_dataset_description_jsons(bids_dir)        
+        
+    #     if not pexists(pjoin(bids_dir, "README")):
+    #         from shutil import copy as shcopy
+    #         shcopy(pjoin(os.path.dirname(__file__),"readme_example"), 
+    #                pjoin(bids_dir, "README"))
+        
+    #     return pat_id, session
+    
+    @staticmethod
+    def make_directories_from(bids_dir, pat_id=None, session=None):
+
+        BIDSHandler.mkdirs_if_not_exist(bids_dir, directories=["sourcedata", "derivatives"])
 
         define_pat_id = pat_id is None
 
@@ -264,77 +390,21 @@ class BIDSHandler:
                 else:
                     session = str(max(sessions) + 1).zfill(2)
 
-        if registrations is not None:
-            BIDSHandler.mkdir_if_not_exists(pjoin(bids_dir, 'sourcedata',
-                                                  f'sub-{pat_id}'))
-            BIDSHandler.mkdir_if_not_exists(pjoin(bids_dir, 'sourcedata',
-                                                  f'sub-{pat_id}',
-                                                  f'ses-{session}'))
+        BIDSHandler.mkdir_if_not_exists(pjoin(bids_dir, 'sourcedata',
+                                              f'sub-{pat_id}'))
+        BIDSHandler.mkdir_if_not_exists(pjoin(bids_dir, 'sourcedata',
+                                              f'sub-{pat_id}',
+                                              f'ses-{session}'))
 
         BIDSHandler.mkdir_if_not_exists(pjoin(subj_dir, f'ses-{session}'))
-        BIDSHandler.mkdir_if_not_exists(pjoin(subj_dir, f'ses-{session}', 'anat'))
-        BIDSHandler.mkdir_if_not_exists(pjoin(subj_dir, f'ses-{session}', 'dwi'))
 
         deriv = pjoin(bids_dir, 'derivatives')
 
-        def add_derivatives_dirs(derivative):
-            BIDSHandler.mkdir_if_not_exists(pjoin(deriv, derivative, f'sub-{pat_id}'))
-            BIDSHandler.mkdir_if_not_exists(pjoin(deriv, derivative,
-                                                  f'sub-{pat_id}', f'ses-{session}'))
-
-
-        all_derivatives = [x for x in next(os.walk(deriv))[1]]
-
-        if derivatives is None:
-            derivatives = []
-
-        if registrations is None:
-            all_derivatives.append("transformation_matrices")
-            all_derivatives.append("lesionmasks")
-
-        all_derivatives = list(set().union(all_derivatives, derivatives))
-
-        BIDSHandler.mkdirs_if_not_exist(deriv, all_derivatives)
-        if registrations is not None:
-            BIDSHandler.mkdir_if_not_exists(pjoin(deriv, 'registrations'))
-
-        if "registrations" in all_derivatives:
-            all_derivatives.remove("registrations")
-
-        for derivative in all_derivatives:
-            add_derivatives_dirs(derivative)
-
-
-        if not registrations is None:
-            for registration in registrations:
-                reg_path = pjoin(deriv, 'registrations',
-                                 "registrations_to_" + registration)
-                BIDSHandler.mkdir_if_not_exists(reg_path)
-
-                BIDSHandler.make_directories_from(reg_path,
-                                                  pat_id=pat_id,
-                                                  session=session,
-                                                  derivatives = all_derivatives,
-                                                  registrations = None)
-
-
-                if registration != 'T2star': continue
-
-                reg_path = pjoin(deriv, 'registrations',
-                             f"registrations_to_{registration}_ses-01")
-                BIDSHandler.mkdir_if_not_exists(reg_path)
-
-                BIDSHandler.make_directories_from(reg_path,
-                                                  pat_id=pat_id,
-                                                  session=session,
-                                                  derivatives = all_derivatives,
-                                                  registrations = None)
-        
         BIDSHandler.add_dataset_description_jsons(bids_dir)        
         
         if not pexists(pjoin(bids_dir, "README")):
             from shutil import copy as shcopy
-            shcopy(pjoin(os.path.dirname(__file__),"readme_example"), 
+            shcopy("readme_example", 
                    pjoin(bids_dir, "README"))
         
         return pat_id, session
@@ -371,123 +441,172 @@ class BIDSHandler:
                 rmtree(s)
 
 
+    # def rename_and_move_nifti(self, dicom_series, pat_id, session='01'):
+
+    #     def move_all(path, filename, file_extensions, dest_dir, new_filename):
+    #         logging.info(filename)
+    #         for file_extension in file_extensions:
+    #             if pexists(pjoin(path, f"{filename}.{file_extension}")):
+    #                 if pexists(pjoin(dest_dir, f"{new_filename}.{file_extension}")):
+    #                     logging.info(f'File already existing in dest dir {pjoin(dest_dir, f"{new_filename}.{file_extension}")}')
+    #                     ext = 'a'
+    #                     for i in range(26):
+    #                         if not pexists(pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}")):
+    #                             shutil.move(pjoin(path, f"{filename}.{file_extension}"),
+    #                                     pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}"))
+    #                             break
+    #                         else:
+    #                             ext = chr(ord(ext)+1)
+    #                 else:
+    #                     shutil.move(pjoin(path, f"{filename}.{file_extension}"),
+    #                         pjoin(dest_dir, f"{new_filename}.{file_extension}"))
+
+    #     bids_dir = self.root_dir
+
+    #     if len(dicom_series) == 1:
+    #         path, series = dicom_series[0]
+    #         moved = []
+    #         for file in os.listdir(path):
+    #             if not file.endswith(".nii.gz") \
+    #                 or file.replace(".nii.gz", "") in moved:
+    #                 continue
+
+    #             if file in self.IGNORED_SERIES or 'Survey' in file:
+    #                 os.remove(pjoin(path, file))
+    #                 os.remove(pjoin(path, file.replace('.nii.gz', '.json')))
+    #                 moved.append(file.replace(".nii.gz", ""))
+    #                 continue
+
+    #             new_names = self.rename(file.replace(".nii.gz", ""),
+    #                                     [file.replace(".nii.gz", "")],
+    #                                     path)
+    #             logging.info(new_names)
+    #             if new_names is None:
+    #                 logging.info(f"DICOM series not recognized: {file.replace('.nii.gz','')}")
+    #                 logging.info(f"Path: {path}")
+    #                 new_names = [file.replace(".nii.gz", "")]
+
+    #             for filename, new_name in zip([file.replace(".nii.gz", "")],
+    #                                           new_names):
+    #                 dos = 'dwi' if new_name == 'DWI' else 'anat'
+    #                 if new_name == "DWI":
+    #                     move_all(path,
+    #                              filename,
+    #                              ["nii.gz", "json", "bval", "bvec"],
+    #                              pjoin(bids_dir, f"sub-{pat_id}",
+    #                                    f"ses-{session}", dos),
+    #                              f"sub-{pat_id}_ses-{session}_{new_name}")
+    #                 elif new_name == "T1map" or new_name == "UNIT1":
+    #                     move_all(path,
+    #                              filename,
+    #                              ["nii.gz", "json"],
+    #                              pjoin(bids_dir, "derivatives", "MP2RAGE",
+    #                                    f"sub-{pat_id}", f"ses-{session}"),
+    #                              f"sub-{pat_id}_ses-{session}_{new_name}")
+    #                 else:
+    #                     move_all(path, filename, ["nii.gz", "json"],
+    #                             pjoin(bids_dir, f"sub-{pat_id}",
+    #                                   f"ses-{session}", dos),
+    #                             f"sub-{pat_id}_ses-{session}_{new_name}")
+
+    #             moved.append(file.replace(".nii.gz", ""))
+
+
+    #     for path, series in dicom_series:
+    #         if series in self.IGNORED_SERIES or 'ORIG' in series \
+    #                                         or 'PSIR' in series \
+    #                                         or 'Survey' in series:
+    #             for file in os.listdir(path):
+    #                 if file.endswith(".nii.gz") or file.endswith(".json"):
+    #                     os.remove(pjoin(path, file))
+    #             continue
+    #         nifti_filenames = []
+    #         for obj in list(os.walk(path))[0][2]:
+    #             if obj.find('.nii.gz') <= 0:
+    #                 continue
+    #             nifti_filenames.append( obj.replace('.nii.gz', '') )
+
+
+    #         new_names = BIDSHandler.rename(series, nifti_filenames, path)
+    #         if new_names is None:
+    #             logging.info(f"DICOM series not recognized: {series}\nPath: {path}")
+    #             new_names = nifti_filenames
+    #         for filename, new_name in zip(nifti_filenames, new_names):
+    #             dos = 'dwi' if new_name == 'DWI' else 'anat'
+    #             if new_name == "DWI":
+    #                 move_all(path,
+    #                          filename,
+    #                          ["nii.gz", "json", "bval", "bvec"],
+    #                          pjoin(bids_dir, f"sub-{pat_id}",
+    #                                f"ses-{session}", dos),
+    #                          f"sub-{pat_id}_ses-{session}_{new_name}")
+    #             elif new_name == "T1map" or new_name == "UNIT1":
+    #                 move_all(path,
+    #                          filename,
+    #                          ["nii.gz", "json"],
+    #                          pjoin(bids_dir, "derivatives", "MP2RAGE",
+    #                                f"sub-{pat_id}", f"ses-{session}"),
+    #                          f"sub-{pat_id}_ses-{session}_{new_name}")
+    #             else:
+    #                 move_all(path, filename, ["nii.gz", "json"],
+    #                         pjoin(bids_dir, f"sub-{pat_id}",
+    #                               f"ses-{session}", dos),
+    #                         f"sub-{pat_id}_ses-{session}_{new_name}")
+
+    #         logging.info(f"SERIES: {series}\n   Filenames: {nifti_filenames}\n")
+    #         logging.info(f"   RENAME: {BIDSHandler.rename(series, nifti_filenames, path)}\n\n")
+
     def rename_and_move_nifti(self, dicom_series, pat_id, session='01'):
 
         def move_all(path, filename, file_extensions, dest_dir, new_filename):
             logging.info(filename)
             for file_extension in file_extensions:
-                if pexists(pjoin(path, f"{filename}.{file_extension}")):
-                    if pexists(pjoin(dest_dir, f"{new_filename}.{file_extension}")):
-                        logging.info(f'File already existing in dest dir {pjoin(dest_dir, f"{new_filename}.{file_extension}")}')
+                if pexists(pjoin(path, f"{filename}{file_extension}")):
+                    if pexists(pjoin(dest_dir, f"{new_filename}{file_extension}")):
+                        logging.info(f'File already existing in dest dir {pjoin(dest_dir, f"{new_filename}{file_extension}")}')
                         ext = 'a'
                         for i in range(26):
-                            if not pexists(pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}")):
-                                shutil.move(pjoin(path, f"{filename}.{file_extension}"),
-                                        pjoin(dest_dir, f"{new_filename}_{ext}.{file_extension}"))
+                            if not pexists(pjoin(dest_dir, f"{new_filename}_{ext}{file_extension}")):
+                                shutil.move(pjoin(path, f"{filename}{file_extension}"),
+                                        pjoin(dest_dir, f"{new_filename}_{ext}{file_extension}"))
                                 break
                             else:
                                 ext = chr(ord(ext)+1)
                     else:
-                        shutil.move(pjoin(path, f"{filename}.{file_extension}"),
-                            pjoin(dest_dir, f"{new_filename}.{file_extension}"))
-
-        bids_dir = self.root_dir
-
-        if len(dicom_series) == 1:
-            path, series = dicom_series[0]
-            moved = []
-            for file in os.listdir(path):
-                if not file.endswith(".nii.gz") \
-                    or file.replace(".nii.gz", "") in moved:
-                    continue
-
-                if file in self.IGNORED_SERIES or 'Survey' in file:
-                    os.remove(pjoin(path, file))
-                    os.remove(pjoin(path, file.replace('.nii.gz', '.json')))
-                    moved.append(file.replace(".nii.gz", ""))
-                    continue
-
-                new_names = self.rename(file.replace(".nii.gz", ""),
-                                        [file.replace(".nii.gz", "")],
-                                        path)
-                logging.info(new_names)
-                if new_names is None:
-                    logging.info(f"DICOM series not recognized: {file.replace('.nii.gz','')}")
-                    logging.info(f"Path: {path}")
-                    new_names = [file.replace(".nii.gz", "")]
-
-                for filename, new_name in zip([file.replace(".nii.gz", "")],
-                                              new_names):
-                    dos = 'dwi' if new_name == 'DWI' else 'anat'
-                    if new_name == "DWI":
-                        move_all(path,
-                                 filename,
-                                 ["nii.gz", "json", "bval", "bvec"],
-                                 pjoin(bids_dir, f"sub-{pat_id}",
-                                       f"ses-{session}", dos),
-                                 f"sub-{pat_id}_ses-{session}_{new_name}")
-                    elif new_name == "T1map" or new_name == "UNIT1":
-                        move_all(path,
-                                 filename,
-                                 ["nii.gz", "json"],
-                                 pjoin(bids_dir, "derivatives", "MP2RAGE",
-                                       f"sub-{pat_id}", f"ses-{session}"),
-                                 f"sub-{pat_id}_ses-{session}_{new_name}")
-                    else:
-                        move_all(path, filename, ["nii.gz", "json"],
-                                pjoin(bids_dir, f"sub-{pat_id}",
-                                      f"ses-{session}", dos),
-                                f"sub-{pat_id}_ses-{session}_{new_name}")
-
-                moved.append(file.replace(".nii.gz", ""))
-
-
-        for path, series in dicom_series:
-            if series in self.IGNORED_SERIES or 'ORIG' in series \
-                                            or 'PSIR' in series \
-                                            or 'Survey' in series:
-                for file in os.listdir(path):
-                    if file.endswith(".nii.gz") or file.endswith(".json"):
-                        os.remove(pjoin(path, file))
-                continue
-            nifti_filenames = []
-            for obj in list(os.walk(path))[0][2]:
-                if obj.find('.nii.gz') <= 0:
-                    continue
-                nifti_filenames.append( obj.replace('.nii.gz', '') )
-
-
-            new_names = BIDSHandler.rename(series, nifti_filenames, path)
-            if new_names is None:
-                logging.info(f"DICOM series not recognized: {series}\nPath: {path}")
-                new_names = nifti_filenames
-            for filename, new_name in zip(nifti_filenames, new_names):
-                dos = 'dwi' if new_name == 'DWI' else 'anat'
-                if new_name == "DWI":
-                    move_all(path,
-                             filename,
-                             ["nii.gz", "json", "bval", "bvec"],
-                             pjoin(bids_dir, f"sub-{pat_id}",
-                                   f"ses-{session}", dos),
-                             f"sub-{pat_id}_ses-{session}_{new_name}")
-                elif new_name == "T1map" or new_name == "UNIT1":
-                    move_all(path,
-                             filename,
-                             ["nii.gz", "json"],
-                             pjoin(bids_dir, "derivatives", "MP2RAGE",
-                                   f"sub-{pat_id}", f"ses-{session}"),
-                             f"sub-{pat_id}_ses-{session}_{new_name}")
-                else:
-                    move_all(path, filename, ["nii.gz", "json"],
-                            pjoin(bids_dir, f"sub-{pat_id}",
-                                  f"ses-{session}", dos),
-                            f"sub-{pat_id}_ses-{session}_{new_name}")
-
-            logging.info(f"SERIES: {series}\n   Filenames: {nifti_filenames}\n")
-            logging.info(f"   RENAME: {BIDSHandler.rename(series, nifti_filenames, path)}\n\n")
-
-
-
+                        shutil.move(pjoin(path, f"{filename}{file_extension}"),
+                            pjoin(dest_dir, f"{new_filename}{file_extension}"))
+        
+        for path, filename in dicom_series:
+            
+            file_extensions = []
+            for _,_,files in os.walk(path):
+                for file in files:
+                    if filename in file:
+                        file_path, file_extension = os.path.splitext(file)
+                        if file_extension == '.gz':
+                            if '.nii' in file_path:
+                                file_extensions.append('.nii.gz')
+                                file_path.replace('.nii', '')
+                        else:
+                            file_extensions.append(file_extension)                            
+            
+            for tag in self.sequences_df.get('Tag'):
+                if tag in filename:
+                    tag_sequences_df = self.sequences_df[self.sequences_df['Tag'] == tag]
+                    for tag_2 in tag_sequences_df.get('Tag2'):
+                        if tag_2 in filename:
+                            tag2_sequences_df = tag_sequences_df[tag_sequences_df['Tag2'] == tag_2]
+                            new_filename = list(tag2_sequences_df.get('Bids_name'))[0]
+                            dos = list(tag2_sequences_df.get('MRI_type'))[0]
+                            if dos != 'IGNORED':
+                                BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', f'ses-{session}',dos))
+                                move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", dos), f"sub-{pat_id}_ses-{session}_{new_filename}")
+                            else:
+                                print('Remove', filename)
+                                for ext in file_extensions:
+                                    if pexists(pjoin(path,f'{filename}{ext}')):
+                                        os.remove(pjoin(path,f'{filename}{ext}'))
+                                
     @staticmethod
     def delete_nii_json_in_dicomdir(dicom_series):
         for path, series in dicom_series:
@@ -567,16 +686,19 @@ class BIDSHandler:
 
         self.copy_dicomfolder_to_sourcedata(dicomfolder, pat_id, session)
 
-        pat_name, pat_date = self.separate_dicoms(dicomfolder, pat_id, session)
+        # pat_name, pat_date = self.separate_dicoms(dicomfolder, pat_id, session)
 
-        self.anonymisation(pat_name, pat_date, pat_id, session)
+        self.anonymisation(pat_id, session)
 
         if return_dicom_series:
             return pat_id, session, dicom_series
         return pat_id, session
 
 
-    def separate_dicoms(self, src, sub, ses):
+    def separate_dicoms(self, sub, ses):
+        
+        src = pjoin(self.root_dir, f'sourcedata', f'sub-{sub}', f'ses-{ses}')
+        
         logging.info('[INFO] Sorting dicoms ...')
         def clean_text(string):
             # clean and standardize text descriptions, which makes searching files easier
@@ -585,8 +707,6 @@ class BIDSHandler:
                 string = string.replace(symbol, "_") # replace everything with an underscore
             return string.lower()
 
-        wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
-
         dst = f"{self.root_dir}/sourcedata/sub-{sub}/ses-{ses}/DICOM/sorted"
 
         logging.info('reading file list...')
@@ -594,7 +714,7 @@ class BIDSHandler:
         corresponding_root = []
         for root, dirs, files in os.walk(src):
             for file in files:
-                if "." not in file[0] or not any([ext in file for ext in wrong_extensions]):# exclude non-dicoms, good for messy folders
+                if "." not in file[0] or not any([ext in file for ext in self.wrong_extensions]):# exclude non-dicoms, good for messy folders
                     unsortedList.append(os.path.join(root, file))
                     corresponding_root.append(root)
 
@@ -636,12 +756,14 @@ class BIDSHandler:
 
             if scanning_sequence == None:
                 scanning_sequence = "NoScanningSequence"
-
-            scanning_sequence = folder + '_' + scanning_sequence
-
+                
+            series_number = ds.get("SeriesNumber")
+            
             scanning_sequence = clean_text(scanning_sequence)
 
-            fileName = patientID + "_" + scanning_sequence + "_" + instanceNumber + ".dcm"
+            fileName = f"{patientID}_{scanning_sequence}_{series_number}_{instanceNumber}.dcm"
+
+            scanning_sequence = f'{folder}_{scanning_sequence}_{series_number}'
 
             # save files to a 4-tier nested folder structure
             if not os.path.exists(os.path.join(dst, scanning_sequence)):
@@ -653,7 +775,39 @@ class BIDSHandler:
 
         return pat_name, pat_date
 
-    def anonymisation(self, pat_name, pat_date, pat_id, pat_ses):
+    def anonymisation(self, pat_id, pat_ses):
+        
+        src = pjoin(self.root_dir, f'sourcedata', f'sub-{pat_id}', f'ses-{pat_ses}')
+        
+        wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
+        
+        pat_name = None
+        pat_date = None
+        
+        for root, dirs, files in os.walk(src):
+            for file in files:
+                if "." not in file[0] or not any([ext in file for ext in wrong_extensions]):# exclude non-dicoms, good for messy folders
+                    # read the file
+                    ds = dcmread(pjoin(root,file), force=True)
+
+                    if pat_name == None:
+                        pat_name = ds.get('PatientName')
+                    if pat_name == None:
+                        pat_name = ds.get('Name')
+                    if pat_date == None:
+                        pat_date = ds.get('AcquisitionDateTime')
+                    if pat_date == None:
+                        pat_date = ds.get('AcquisitionDate')
+                    if pat_date == None:
+                        pat_date = ds.get('Date')
+                    if pat_date == None:
+                        pat_date = ds.get('ContentDate')
+                
+                if pat_name != None and pat_date != None:
+                    break
+            
+            if pat_name != None and pat_date != None:
+                break
 
         if pexists(pjoin(self.root_dir, "participants.tsv")):
             anonym = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()

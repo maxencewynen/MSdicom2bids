@@ -14,10 +14,7 @@ import zipfile
 
 dicom2niix_path = "dcm2niix"
 
-list_dicoms = ["/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/VENTURI29-10-2021",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/VERBEKE090721.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/Wantier_19-03-21.zip",
-"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/DB_DICOM_R4/WUYTENS300321.zip"]
+list_dicoms = []
 
 bidshandler = BIDSHandler(root_dir=r"/media/stluc/Colin Vanden Bulcke Drive/DISSECT_MS/BIDS_R4", dicom2niix_path=dicom2niix_path)
 
