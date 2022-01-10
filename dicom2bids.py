@@ -213,7 +213,25 @@ class BIDSHandler:
                         dataset_description["PipelineDescription"]["Name"] = d
                         with open(pjoin(subdir, d, 'dataset_description.json'), 'w') as fp:
                             json.dump(dataset_description, fp)
-    
+                            
+    @staticmethod
+    def update_authors_to_dataset_description(bids_dir, authors=[]):
+        with open(pjoin(bids_dir, 'dataset_description.json')) as dd:
+            dataset_description = json.load(dd)
+        dataset_description['Authors'] = authors
+        with open(pjoin(bids_dir, 'dataset_description.json'), 'w') as dd:
+            json.dump(dataset_description, dd)
+
+    def get_dataset_description(self):
+        try:
+            with open(pjoin(self.root_dir, 'dataset_description.json')) as dd:
+                try:
+                    dataset_description = json.load(dd)
+                    return dataset_description
+                except Exception:
+                    return {}
+        except FileNotFoundError:
+            return {}
     # @staticmethod
     # def make_directories_from(bids_dir,
     #                         pat_id=None,
@@ -588,24 +606,81 @@ class BIDSHandler:
                                 file_extensions.append('.nii.gz')
                                 file_path.replace('.nii', '')
                         else:
-                            file_extensions.append(file_extension)                            
+                            file_extensions.append(file_extension)  
+                            
+            bids_sequence_name = {}
             
-            for tag in self.sequences_df.get('Tag'):
-                if tag in filename:
-                    tag_sequences_df = self.sequences_df[self.sequences_df['Tag'] == tag]
-                    for tag_2 in tag_sequences_df.get('Tag2'):
-                        if tag_2 in filename:
-                            tag2_sequences_df = tag_sequences_df[tag_sequences_df['Tag2'] == tag_2]
-                            new_filename = list(tag2_sequences_df.get('Bids_name'))[0]
-                            dos = list(tag2_sequences_df.get('MRI_type'))[0]
-                            if dos != 'IGNORED':
-                                BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', f'ses-{session}',dos))
-                                move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", dos), f"sub-{pat_id}_ses-{session}_{new_filename}")
-                            else:
-                                print('Remove', filename)
-                                for ext in file_extensions:
-                                    if pexists(pjoin(path,f'{filename}{ext}')):
-                                        os.remove(pjoin(path,f'{filename}{ext}'))
+            # for tag in self.sequences_df.get('Tag'):
+            #     if tag in filename:
+            #         tag_sequences_df = self.sequences_df[self.sequences_df['Tag'] == tag]
+            #         for tag_2 in tag_sequences_df.get('Tag2'):
+            #             if tag_2 in filename:
+            #                 tag2_sequences_df = tag_sequences_df[tag_sequences_df['Tag2'] == tag_2]
+            #                 new_filename = list(tag2_sequences_df.get('Bids_name'))[0]
+            #                 dos = list(tag2_sequences_df.get('MRI_type'))[0]
+            #                 if dos != 'IGNORED':
+            #                     BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', f'ses-{session}',dos))
+            #                     move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", dos), f"sub-{pat_id}_ses-{session}_{new_filename}")
+            #                 else:
+            #                     print('Remove', filename)
+            #                     for ext in file_extensions:
+            #                         if pexists(pjoin(path,f'{filename}{ext}')):
+            #                             os.remove(pjoin(path,f'{filename}{ext}'))
+            for modality in self.sequences_df.get('modality'):
+                if '+' in modality:
+                    modalities = modality.split('+')
+                else:
+                    modalities = [modality]
+                if all([mod in filename for mod in modalities]):
+                    mod_sequences_df = self.sequences_df[self.sequences_df['modality'] == modality]
+                    bids_sequence_name['modality_bids'] = list(mod_sequences_df.get('modality_bids'))[0]
+                    bids_sequence_name['MRI_type'] = list(mod_sequences_df.get('MRI_type'))[0]
+                    # for acq in mod_sequences_df.get('Acq'):
+                    #     if acq in filename:
+                    #         if acq != '':
+                    #             bids_sequence_name['acq_bids'] = list(mod_sequences_df.get('acq_bids'))[0]
+                    #             break
+                    # for ce in mod_sequences_df.get('CE'):
+                    #     if ce in filename:
+                    #         if ce != '':
+                    #             bids_sequence_name['ce_bids'] = list(mod_sequences_df.get('acq_bids'))[0]
+                    #             break
+                    # for ce in mod_sequences_df.get('CE'):
+                    #     if ce in filename:
+                    #         if ce != '':
+                    #             bids_sequence_name['ce_bids'] = list(mod_sequences_df.get('acq_bids'))[0]
+                    #             break
+                    for key in mod_sequences_df.keys():
+                        if key not in ['modality', 'modality_bids', 'MRI_type'] and 'bids' not in key:
+                            i = 0
+                            for k in mod_sequences_df.get(key):
+                                if k in filename:
+                                    if k != '':
+                                        bids_sequence_name[f'{key}_bids'] = list(mod_sequences_df.get(f'{key}_bids'))[i]
+                                        break
+                                i = i+1
+                    break
+                                    
+            if bids_sequence_name['MRI_type'] != 'IGNORED':
+                bids_filename = f'sub-{pat_id}_ses-{session}_'
+                for key in bids_sequence_name.keys():
+                    if key not in ['modality_bids', 'MRI_type']:
+                        field = key.replace('_bids','')
+                        label = bids_sequence_name[key]
+                        try:
+                            label = int(label)
+                        except ValueError:
+                            pass                                
+                        bids_filename = bids_filename + f'{field}-{label}_'
+                bids_filename = bids_filename + bids_sequence_name['modality_bids']
+                BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', f'ses-{session}', bids_sequence_name['MRI_type']))
+                move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", bids_sequence_name['MRI_type']), bids_filename)
+            else:
+                print('Remove', filename)
+                for ext in file_extensions:
+                    if pexists(pjoin(path,f'{filename}{ext}')):
+                        os.remove(pjoin(path,f'{filename}{ext}'))
+                            
                                 
     @staticmethod
     def delete_nii_json_in_dicomdir(dicom_series):
@@ -640,6 +715,14 @@ class BIDSHandler:
                 shutil.move(dirpath, dirpath.replace(f"sub-{old_id}",
                                                      f"sub-{new_id}"))
 
+    def rename_session(self, subject, old_ses, new_ses):
+        pass
+    
+    def rename_sequence(self, old_seq, new_seq):
+        for path, dirs, files in os.walk(self.root_dir):
+            for file in files:
+                if old_seq in file:
+                    os.rename(pjoin(path, file), pjoin(path, file.replace(old_seq, new_seq)))
 
     def copy_dicomfolder_to_sourcedata(self, dicomfolder, pat_id, session):
         sourcedata = pjoin(self.root_dir, "sourcedata")
@@ -812,21 +895,21 @@ class BIDSHandler:
         if pexists(pjoin(self.root_dir, "participants.tsv")):
             anonym = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
         else:
-            anonym = {'PatientName':{}, 'Bids_ID':{}, 'Date ses-01':{}}
+            anonym = {'participant_name':{}, 'participant_id':{}, 'ses-01':{}}
 
         # check if new patient
         if pat_ses != '01':
-            key_num = list(anonym['Bids_ID'].values()).index(int(pat_id))
-            if f'Date ses-{pat_ses}' not in anonym.keys():
-                anonym[f'Date ses-{pat_ses}'] = {}
+            key_num = list(anonym['participant_id'].values()).index(f'sub-{pat_id}')
+            if f'ses-{pat_ses}' not in anonym.keys():
+                anonym[f'ses-{pat_ses}'] = {}
             # update dicionary with the date of the new session
-            anonym[f'Date ses-{pat_ses}'][key_num] = pat_date
+            anonym[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
         else:
             # add new patient
-            key_num = len(anonym['Bids_ID'])
-            anonym['PatientName'][key_num] = pat_name
-            anonym['Bids_ID'][key_num] = pat_id
-            anonym['Date ses-01'][key_num] = pat_date
+            key_num = len(anonym['participant_id'])
+            anonym['participant_name'][key_num] = pat_name
+            anonym['participant_id'][key_num] = f'sub-{pat_id}'
+            anonym['ses-01'][key_num] = pd.Timestamp(pat_date)
 
         # Save anonym dic to csv
         anonym_df = pd.DataFrame(anonym)

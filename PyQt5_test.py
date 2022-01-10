@@ -9,16 +9,20 @@ BIDS MANAGER GUI
 
 import sys
 import os
+from os.path import join as pjoin
+from os.path import exists as pexists
 from dicom2bids import *
 import logging
 from PyQt5.QtCore import QSize, Qt, QModelIndex
-from PyQt5.QtWidgets import QDesktopWidget, QApplication, QWidget, QPushButton, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QTreeView, QFileSystemModel, QGridLayout, QPlainTextEdit, QMessageBox, QListWidget, QTableWidget, QTableWidgetItem, QMenu
+from PyQt5.QtWidgets import QDesktopWidget, QApplication, QWidget, QPushButton, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QTreeView, QFileSystemModel, QGridLayout, QPlainTextEdit, QMessageBox, QListWidget, QTableWidget, QTableWidgetItem, QMenu, QAction
 from PyQt5.QtGui import QFont
 import traceback
 import threading
 import subprocess
 import pandas as pd
 import platform
+import json
+from bids_validator import BIDSValidator
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -30,15 +34,41 @@ class MainWindow(QMainWindow):
             for key in self.memory.keys():
                 self.memory[key] = self.memory[key][0]
         except FileNotFoundError: 
-            print('test')
             pass          
         self.system = platform.system()
+        
+        self.pipelines = {}
+        self.pipelines_name = []
+        
+        for root, dirs, files in os.walk('Pipelines'):
+            for file in files:
+                if '.json' in file:
+                    f = open(pjoin(root,file))
+                    jsn = json.load(f)
+                    self.pipelines_name.append(jsn.get('name'))
+                    import_name = jsn.get('import_name')
+                    attr = jsn.get('attr')
+                    self.pipelines[jsn.get('name')] = jsn
+                    self.pipelines[jsn.get('name')]['import'] = __import__(f'Pipelines.{import_name}', globals(), locals(), [attr], 0)
+                    # self.pipelines[jsn.get('name')]['launcher'] = self.pipelines[jsn.get('name')]['import'].
+                    f.close()
+                    
+        # Create menu bar and add action
+        self.menu_bar = self.menuBar()
+        self.PipelinesMenu = self.menu_bar.addMenu('&Pipelines')
+        
+        for pipe in self.pipelines_name:
+            new_action = QAction(f'&{pipe}', self)
+            new_action.triggered.connect(lambda checked, arg=pipe: self.launch_pipeline(arg))
+            self.PipelinesMenu.addAction(new_action)
+                    
         self.init_ui()
-
+        
     def init_ui(self):
         self.setWindowTitle('Main Window')
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
+        
         self.center()
 
         self.bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
@@ -46,7 +76,7 @@ class MainWindow(QMainWindow):
             self.bids_dir = str(QFileDialog.getExistingDirectory(self, "Please, select BIDS Directory"))
 
         self.dcm2niix_path = self.memory.get('dcm2niix_path')
-
+        
         self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path=self.dcm2niix_path)
         bids_dir_split = self.bids_dir.split('/')
         self.bids_name = bids_dir_split[len(bids_dir_split)-1]
@@ -60,6 +90,10 @@ class MainWindow(QMainWindow):
         self.bids_actions = BidsActions(self)
 
         self.bids_dialog = BidsDialog(self)
+        
+        validator = BIDSValidator()
+        if not validator.is_bids(self.bids_dir):
+            logging.warning('/!\ Directory is not considered as a valid BIDS directory !!!')
 
         layout = QGridLayout()
         layout.addWidget(self.bids_lab, 0, 1, 1, 2)
@@ -69,7 +103,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.bids_dialog, 2, 1, 1, 2)
 
         self.window.setLayout(layout)
-
+        
         self.center()
 
     def center(self):
@@ -116,6 +150,9 @@ class MainWindow(QMainWindow):
             self.window.setLayout(layout)
         else:
             pass
+        
+    def launch_pipeline(self, pipe):
+        self.pipelines[pipe]['import'].launch(self)
 
 # class OpeningWindow(QWidget):
 #     def __init__(self):
@@ -267,14 +304,46 @@ class BidsMetadata(QWidget):
         self.bids = self.parent.bids
         self.number_of_subjects = QLabel(f"Number of subjects: {self.bids.number_of_subjects}")
         self.number_of_subjects.setFont(QFont('Calibri', 15))
-
+        
         layout = QVBoxLayout()
         layout.addWidget(self.number_of_subjects)
+        
+        dataset_description = self.bids.get_dataset_description()
+        bids_version = dataset_description.get('BIDSVersion')
+        authors = dataset_description.get('Authors')
+        
+        self.bids_version = QLabel(f"BIDSVersion: {bids_version}")
+        self.bids_version.setFont(QFont('Calibri', 12))
+        layout.addWidget(self.bids_version)
+        
+        authors_lab = f"Authors: "
+        authors = authors if authors != None else []
+        for author in authors:
+            if author == authors[-1]:
+                authors_lab = authors_lab + author
+            else:
+                authors_lab = authors_lab + f'{author}\n         '
+        self.authors = QLabel(authors_lab)
+        self.authors.setFont(QFont('Calibri', 12))
+        layout.addWidget(self.authors)
+        
         self.setLayout(layout)
 
     def update_metadata(self):
         self.bids = self.parent.bids
         self.number_of_subjects.setText(f"Number of subjects: {self.bids.number_of_subjects}")
+        dataset_description = self.bids.get_dataset_description()
+        bids_version = dataset_description.get('BIDSVersion')
+        authors = dataset_description.get('Authors')
+        authors_lab = f"Authors: "
+        authors = authors if authors != None else []
+        for author in authors:
+            if author == authors[-1]:
+                authors_lab = authors_lab + author
+            else:
+                authors_lab = authors_lab + f'{author}\n         '
+        self.bids_version.setText(f"BIDSVersion: {bids_version}")
+        self.authors.setText(authors_lab)
 
 class BidsActions(QWidget):
 
@@ -297,17 +366,32 @@ class BidsActions(QWidget):
 
         self.rename_ses_button = QPushButton("Rename session")
         self.rename_ses_button.clicked.connect(self.rename_ses)
+        
+        self.rename_seq_button = QPushButton("Rename sequence")
+        self.rename_seq_button.clicked.connect(self.rename_seq)
+        
+        self.update_authors_button = QPushButton("Update authors")
+        self.update_authors_button.clicked.connect(self.update_authors)
 
-        layout = QVBoxLayout()
-        sub_layout = QHBoxLayout()
-        sub_layout.addWidget(self.add_button)
-        sub_layout.addWidget(self.remove_button)
-        sub_layout_1 = QHBoxLayout()
-        sub_layout_1.addWidget(self.rename_sub_button)
-        sub_layout_1.addWidget(self.rename_ses_button)
-        layout.addWidget(self.change_bids_dir_button)
-        layout.addLayout(sub_layout)
-        layout.addLayout(sub_layout_1)
+        # layout = QVBoxLayout()
+        # sub_layout = QHBoxLayout()
+        # sub_layout.addWidget(self.add_button)
+        # sub_layout.addWidget(self.remove_button)
+        # sub_layout_1 = QHBoxLayout()
+        # sub_layout_1.addWidget(self.rename_sub_button)
+        # sub_layout_1.addWidget(self.rename_ses_button)
+        # layout.addWidget(self.change_bids_dir_button)
+        # layout.addLayout(sub_layout)
+        # layout.addLayout(sub_layout_1)
+        
+        layout = QGridLayout()
+        layout.addWidget(self.change_bids_dir_button, 0, 0, 1, 2)
+        layout.addWidget(self.add_button, 1, 0, 1, 1)
+        layout.addWidget(self.remove_button, 1, 1, 1, 1)
+        layout.addWidget(self.rename_sub_button, 2, 0, 1, 1)
+        layout.addWidget(self.rename_ses_button, 2, 1, 1, 1)
+        layout.addWidget(self.rename_seq_button, 3, 0, 1, 1)
+        layout.addWidget(self.update_authors_button, 3, 1, 1, 1)
 
         self.setLayout(layout)
 
@@ -347,7 +431,16 @@ class BidsActions(QWidget):
     def update_bids(self, parent):
         self.parent = parent
         self.bids = self.parent.bids
-
+        
+    def rename_seq(self):
+        logging.info("rename_seq")
+        self.renameSeq_win = RenameSequence(self)
+        self.renameSeq_win.show()
+    
+    def update_authors(self):
+        logging.info("update_authors")
+        self.updateAuthors_win = UpdateAuthors(self)
+        self.updateAuthors_win.show()
 
 
 class RemoveWindow(QMainWindow):
@@ -550,6 +643,84 @@ class RenameSubject(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+        
+class RenameSequence(QMainWindow):
+
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+
+        self.setWindowTitle("Rename Sequence")
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        self.center()
+
+        self.old_seq = QLineEdit(self)
+        self.old_seq.setPlaceholderText("Old Sequence")
+        self.new_seq = QLineEdit(self)
+        self.new_seq.setPlaceholderText("New Sequence")
+        self.rename_button = QPushButton("Rename Sequence")
+        self.rename_button.clicked.connect(self.rename_seq)
+
+        layout = QGridLayout()
+        layout.addWidget(self.old_seq, 0, 0, 1, 1)
+        layout.addWidget(self.new_seq, 0, 1, 1, 1)
+        layout.addWidget(self.rename_button, 1, 0, 1, 2)
+
+        self.window.setLayout(layout)
+
+    def rename_seq(self):
+        old_seq = self.old_seq.text()
+        new_seq = self.new_seq.text()
+
+        self.bids.rename_sequence(old_seq, new_seq)
+        logging.info(f"old {old_seq} renamed to new {new_seq}")
+
+    def center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+        
+class UpdateAuthors(QMainWindow):
+
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+
+        self.setWindowTitle("Update Authors")
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        self.center()
+
+        self.authors = QLineEdit(self)
+        self.authors.setPlaceholderText("Authors")
+        self.update_authors_button = QPushButton("Update Authors")
+        self.update_authors_button.clicked.connect(self.update_authors)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.authors)
+        layout.addWidget(self.update_authors_button)
+
+        self.window.setLayout(layout)
+
+    def update_authors(self):
+        authors = self.authors.text()
+        if ',' in authors:
+            authors_list = authors.split(',')
+        else:
+            authors_list = [authors]
+        self.bids.update_authors_to_dataset_description(self.bids.root_dir, authors=authors_list)
+        logging.info(f"Updating {authors} as BIDS directory authors")
+        self.parent.parent.bids_metadata.update_metadata()
+
+    def center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
 
 class QTextEditLogger(logging.Handler):
@@ -656,6 +827,8 @@ class StreamToLogger(object):
 #         logging.info('something to remember')
 #         logging.warning('that\'s not right')
 #         logging.error('foobar')
+
+
 
 if __name__ == "__main__":
 

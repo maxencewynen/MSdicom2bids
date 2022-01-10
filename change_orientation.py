@@ -11,7 +11,7 @@ import numpy as np
 # import sys
 
 
-def reorient(subject, session, sequence_name, axis, DIR="/media/stluc/Elements/DISSECT_MS_DATABASE"):
+def reorient(subject, session, sequence_name, axis, DIR="/media/stluc/MS-PRL/MS-PRL/MS-PRL_NIH/DATA"):
     sub = subject
     ses = session
     axis = axis
@@ -30,7 +30,7 @@ def reorient(subject, session, sequence_name, axis, DIR="/media/stluc/Elements/D
 
 
 
-def separate_epi(subject, session, DIR="/media/stluc/Elements/DISSECT_MS_DATABASE"):
+def separate_epi(subject, session, DIR="/media/stluc/MS-PRL/MS-PRL/MS-PRL_NIH/DATA"):
     img = nib.load(f"{DIR}/sub-{subject}/ses-{session}/anat/sub-{subject}_ses-{session}_EPI.nii.gz")
     epi4d = img.get_fdata()
     dim1 = epi4d[:,:,:,0]
