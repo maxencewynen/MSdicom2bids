@@ -33,13 +33,13 @@ class MainWindow(QMainWindow):
             self.memory = memory_df.to_dict()
             for key in self.memory.keys():
                 self.memory[key] = self.memory[key][0]
-        except FileNotFoundError: 
-            pass          
+        except FileNotFoundError:
+            pass
         self.system = platform.system()
-        
+
         self.pipelines = {}
         self.pipelines_name = []
-        
+
         for root, dirs, files in os.walk('Pipelines'):
             for file in files:
                 if '.json' in file:
@@ -52,20 +52,20 @@ class MainWindow(QMainWindow):
                     self.pipelines[jsn.get('name')]['import'] = __import__(f'Pipelines.{import_name}', globals(), locals(), [attr], 0)
                     # self.pipelines[jsn.get('name')]['launcher'] = self.pipelines[jsn.get('name')]['import'].
                     f.close()
-                    
+
         # Create menu bar and add action
         self.menu_bar = self.menuBar()
         self.PipelinesMenu = self.menu_bar.addMenu('&Pipelines')
-        
+
         for pipe in self.pipelines_name:
             new_action = QAction(f'&{pipe}', self)
             new_action.triggered.connect(lambda checked, arg=pipe: self.launch_pipeline(arg))
             self.PipelinesMenu.addAction(new_action)
-                    
+
         self.init_ui()
-        
+
     def init_ui(self):
-        self.setWindowTitle('Main Window')
+        self.setWindowTitle('BIDS Manager')
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         
@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
             self.bids_dir = str(QFileDialog.getExistingDirectory(self, "Please, select BIDS Directory"))
 
         self.dcm2niix_path = self.memory.get('dcm2niix_path')
-        
+
         self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path=self.dcm2niix_path)
         bids_dir_split = self.bids_dir.split('/')
         self.bids_name = bids_dir_split[len(bids_dir_split)-1]
@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         self.bids_actions = BidsActions(self)
 
         self.bids_dialog = BidsDialog(self)
-        
+
         validator = BIDSValidator()
         if not validator.is_bids(self.bids_dir):
             logging.warning('/!\ Directory is not considered as a valid BIDS directory !!!')
@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.bids_dialog, 2, 1, 1, 2)
 
         self.window.setLayout(layout)
-        
+
         self.center()
 
     def center(self):
@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
             self.window.setLayout(layout)
         else:
             pass
-        
+
     def launch_pipeline(self, pipe):
         self.pipelines[pipe]['import'].launch(self)
 
@@ -205,7 +205,7 @@ class BidsDirView(QWidget):
         self.tree.doubleClicked.connect(self.treeMedia_doubleClicked)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.openMenu)
-        
+
         self.itksnap = None
 
         layout = QVBoxLayout()
@@ -257,7 +257,7 @@ class BidsDirView(QWidget):
                 openAdd = menu.addAction('Open as additional image')
                 openSeg = menu.addAction('Open as segmentation')
         action = menu.exec_(self.tree.viewport().mapToGlobal(position))
-        
+
         if action == openWith:
             logging.debug('Open With')
             self.itksnap = QFileDialog.getOpenFileName(self, "Select the path to itksnap")[0]
@@ -266,17 +266,17 @@ class BidsDirView(QWidget):
                 self.parent.memory['itksnap'] = self.itksnap
             else:
                 logging.info(f'No application selected open MRI \n \t Please select itksnap path')
-               
+
         if action == openAdd:
             logging.debug('Open as additional image')
             subprocess.call([self.itksnap, '-o', item_path])
-            
+
         if action == openSeg:
             logging.debug('Open as segmentation')
             subprocess.call([self.itksnap, '-s', item_path])
-        
-        
-        
+
+
+
 # class BidsDirView(QWidget):
 
 #     def __init__(self, dir_path):
@@ -304,18 +304,18 @@ class BidsMetadata(QWidget):
         self.bids = self.parent.bids
         self.number_of_subjects = QLabel(f"Number of subjects: {self.bids.number_of_subjects}")
         self.number_of_subjects.setFont(QFont('Calibri', 15))
-        
+
         layout = QVBoxLayout()
         layout.addWidget(self.number_of_subjects)
-        
+
         dataset_description = self.bids.get_dataset_description()
         bids_version = dataset_description.get('BIDSVersion')
         authors = dataset_description.get('Authors')
-        
+
         self.bids_version = QLabel(f"BIDSVersion: {bids_version}")
         self.bids_version.setFont(QFont('Calibri', 12))
         layout.addWidget(self.bids_version)
-        
+
         authors_lab = f"Authors: "
         authors = authors if authors != None else []
         for author in authors:
@@ -326,7 +326,7 @@ class BidsMetadata(QWidget):
         self.authors = QLabel(authors_lab)
         self.authors.setFont(QFont('Calibri', 12))
         layout.addWidget(self.authors)
-        
+
         self.setLayout(layout)
 
     def update_metadata(self):
@@ -366,10 +366,10 @@ class BidsActions(QWidget):
 
         self.rename_ses_button = QPushButton("Rename session")
         self.rename_ses_button.clicked.connect(self.rename_ses)
-        
+
         self.rename_seq_button = QPushButton("Rename sequence")
         self.rename_seq_button.clicked.connect(self.rename_seq)
-        
+
         self.update_authors_button = QPushButton("Update authors")
         self.update_authors_button.clicked.connect(self.update_authors)
 
@@ -383,7 +383,7 @@ class BidsActions(QWidget):
         # layout.addWidget(self.change_bids_dir_button)
         # layout.addLayout(sub_layout)
         # layout.addLayout(sub_layout_1)
-        
+
         layout = QGridLayout()
         layout.addWidget(self.change_bids_dir_button, 0, 0, 1, 2)
         layout.addWidget(self.add_button, 1, 0, 1, 1)
@@ -431,12 +431,12 @@ class BidsActions(QWidget):
     def update_bids(self, parent):
         self.parent = parent
         self.bids = self.parent.bids
-        
+
     def rename_seq(self):
         logging.info("rename_seq")
         self.renameSeq_win = RenameSequence(self)
         self.renameSeq_win.show()
-    
+
     def update_authors(self):
         logging.info("update_authors")
         self.updateAuthors_win = UpdateAuthors(self)
@@ -564,13 +564,13 @@ class AddWindow(QMainWindow):
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
         self.list_view.setItem(rowPosition , 1, QTableWidgetItem(subject))
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
-        # self.list_to_add.append((dicom_folder, subject, session))        
+        # self.list_to_add.append((dicom_folder, subject, session))
 
     def add(self):
         #get items
         for i in range(self.list_view.rowCount()):
             self.list_to_add.append((self.list_view.item(i,0).text(), self.list_view.item(i,1).text() if self.list_view.item(i,1).text() != '' else None, self.list_view.item(i,2).text() if self.list_view.item(i,2).text() != '' else None))
-        
+
         for item in self.list_to_add:
 
             dicom = item[0]
@@ -598,7 +598,7 @@ class AddWindow(QMainWindow):
                 # logging.info(exc_type, fname, exc_tb.tb_lineno)
                 traceback.logging.info_exc()
         logging.info("[INFO] All done.")
-        
+
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
@@ -643,7 +643,7 @@ class RenameSubject(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
+
 class RenameSequence(QMainWindow):
 
     def __init__(self, parent):
@@ -682,7 +682,7 @@ class RenameSequence(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
+
 class UpdateAuthors(QMainWindow):
 
     def __init__(self, parent):
