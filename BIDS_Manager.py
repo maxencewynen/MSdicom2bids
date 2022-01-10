@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
             for key in self.memory.keys():
                 self.memory[key] = self.memory[key][0]
         except FileNotFoundError:
-            pass
+            memory_df = {}
         self.system = platform.system()
 
         self.pipelines = {}
