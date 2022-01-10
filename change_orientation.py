@@ -11,7 +11,7 @@ import numpy as np
 # import sys
 
 
-def reorient(subject, session, sequence_name, axis, DIR="/media/stluc/Elements/DISSECT_MS_DATABASE"):
+def reorient(subject, session, sequence_name, axis, DIR="/media/maggi/MS-PRL/MS-PRL/MS-PRL_NIH/DATA"):
     sub = subject
     ses = session
     axis = axis
