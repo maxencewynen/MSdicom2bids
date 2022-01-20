@@ -7,15 +7,46 @@ Created on Wed Nov 10 14:25:40 2021
 BIDS MANAGER GUI
 """
 
+import time
 import sys
 import os
 from os.path import join as pjoin
 from os.path import exists as pexists
 from dicom2bids import *
 import logging
-from PyQt5.QtCore import QSize, Qt, QModelIndex
-from PyQt5.QtWidgets import QDesktopWidget, QApplication, QWidget, QPushButton, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QTreeView, QFileSystemModel, QGridLayout, QPlainTextEdit, QMessageBox, QListWidget, QTableWidget, QTableWidgetItem, QMenu, QAction
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import (QSize, 
+                          Qt, 
+                          QModelIndex, 
+                          QMutex, 
+                          QObject, 
+                          QThread, 
+                          pyqtSignal, 
+                          pyqtSlot,
+                          QRunnable, 
+                          QThreadPool)
+from PyQt5.QtWidgets import (QDesktopWidget, 
+                             QApplication, 
+                             QWidget, 
+                             QPushButton, 
+                             QMainWindow,
+                             QLabel, 
+                             QLineEdit, 
+                             QVBoxLayout, 
+                             QHBoxLayout, 
+                             QFileDialog, 
+                             QDialog, 
+                             QTreeView, 
+                             QFileSystemModel, 
+                             QGridLayout, 
+                             QPlainTextEdit,
+                             QMessageBox, 
+                             QListWidget, 
+                             QTableWidget, 
+                             QTableWidgetItem, 
+                             QMenu, 
+                             QAction)
+from PyQt5.QtGui import (QFont, 
+                         QIcon)
 import traceback
 import threading
 import subprocess
@@ -61,11 +92,20 @@ class MainWindow(QMainWindow):
             new_action = QAction(f'&{pipe}', self)
             new_action.triggered.connect(lambda checked, arg=pipe: self.launch_pipeline(arg))
             self.PipelinesMenu.addAction(new_action)
+        
+        self.threads_pool = QThreadPool.globalInstance()
+        
+        
+        self.sys_stdout = sys.stdout
+        self.sys_stderr = sys.stderr
+        # sys.stdout = logging.info
+        # sys.stderr = logging.error
 
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle('BIDS Manager')
+        self.setWindowIcon(QIcon('bids_icon.png'))
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         
@@ -153,6 +193,7 @@ class MainWindow(QMainWindow):
 
     def launch_pipeline(self, pipe):
         self.pipelines[pipe]['import'].launch(self)
+        
 
 # class OpeningWindow(QWidget):
 #     def __init__(self):
@@ -186,11 +227,22 @@ class MainWindow(QMainWindow):
 
 #         logging.info(self.folderpath)
 
+    def closeEvent(self, event):
+        sys.stdout = self.sys_stdout
+        sys.stderr = self.sys_stderr
+
+    def close(self):
+        sys.stdout = self.sys_stdout
+        sys.stderr = self.sys_stderr
+        
+
 class BidsDirView(QWidget):
 
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
         dir_path = self.parent.bids_dir
         self.setWindowTitle('File System Viewer')
         self.setMinimumSize(250, 700)
@@ -203,9 +255,11 @@ class BidsDirView(QWidget):
         self.tree.setColumnWidth(0,250)
         self.tree.setAlternatingRowColors(True)
         self.tree.doubleClicked.connect(self.treeMedia_doubleClicked)
+        self.tree.setDragEnabled(True)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.openMenu)
-
+        self.threads = []
+        
         self.itksnap = None
 
         layout = QVBoxLayout()
@@ -229,14 +283,54 @@ class BidsDirView(QWidget):
                     logging.info(f'No application selected open MRI \n \t Please select itksnap path')
                 else:
                     print(self.itksnap)
-                    subprocess.call([self.itksnap, '-g', f"{item_path}"])
+                    # subprocess.call([self.itksnap, '-g', f"{item_path}"])
+                    # operation = RunnableSubprocess(f'{self.itksnap} -g {item_path}')
+                    # self.parent.threads_pool.start(operation)
+                    self.threads.append(QThread())
+                    self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
+                    self.operation.moveToThread(self.threads[-1])
+                    self.threads[-1].started.connect(self.operation.run)
+                    self.operation.finished.connect(self.threads[-1].quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+                    self.threads[-1].start()
             else:
                 if self.parent.system == 'Linux':
-                    subprocess.call(['xdg-open', f"{item_path}"])
+                    # subprocess.call(['xdg-open', f"{item_path}"])
+                    # operation = RunnableSubprocess(f'xdg-open {item_path}')
+                    # self.parent.threads_pool.start(operation)
+                    self.threads.append(QThread())
+                    self.operation = SubprocessWorker(f'xdg-open {item_path}')
+                    self.operation.moveToThread(self.threads[-1])
+                    self.threads[-1].started.connect(self.operation.run)
+                    self.operation.finished.connect(self.threads[-1].quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+                    self.threads[-1].start()
                 elif self.parent.system == 'Darwin':
-                    subprocess.call(['open', f"{item_path}"])
+                    # subprocess.call(['open', f"{item_path}"])
+                    # operation = RunnableSubprocess(f'open {item_path}')
+                    # self.parent.threads_pool.start(operation)
+                    self.threads.append(QThread())
+                    self.operation = SubprocessWorker(f'open {item_path}')
+                    self.operation.moveToThread(self.threads[-1])
+                    self.threads[-1].started.connect(self.operation.run)
+                    self.operation.finished.connect(self.threads[-1].quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+                    self.threads[-1].start()
                 elif self.parent.system == 'Windows':
-                    subprocess.call(['start', f"{item_path}"])
+                    # subprocess.call(['start', f"{item_path}"])
+                    # operation = RunnableSubprocess(f'start {item_path}')
+                    # self.parent.threads_pool.start(operation)
+                    self.threads.append(QThread())
+                    self.operation = SubprocessWorker(f'start {item_path}')
+                    self.operation.moveToThread(self.threads[-1])
+                    self.threads[-1].started.connect(self.operation.run)
+                    self.operation.finished.connect(self.threads[-1].quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+                    self.threads[-1].start()
                 else:
                     logging.warning('The program does not recognize the OS')
         else:
@@ -262,18 +356,48 @@ class BidsDirView(QWidget):
             logging.debug('Open With')
             self.itksnap = QFileDialog.getOpenFileName(self, "Select the path to itksnap")[0]
             if self.itksnap != None and self.itksnap != '':
-                subprocess.call([self.itksnap, '-g', item_path])
+                # subprocess.call([self.itksnap, '-g', item_path])
+                # operation = RunnableSubprocess(f'{self.itksnap} -g {item_path}')
+                # self.parent.threads_pool.start(operation)
+                self.threads.append(QThread())
+                self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
+                self.operation.moveToThread(self.threads[-1])
+                self.threads[-1].started.connect(self.operation.run)
+                self.operation.finished.connect(self.threads[-1].quit)
+                self.operation.finished.connect(self.operation.deleteLater)
+                self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+                self.threads[-1].start()
                 self.parent.memory['itksnap'] = self.itksnap
             else:
                 logging.info(f'No application selected open MRI \n \t Please select itksnap path')
 
         if action == openAdd:
             logging.debug('Open as additional image')
-            subprocess.call([self.itksnap, '-o', item_path])
+            # subprocess.call([self.itksnap, '-o', item_path])
+            # operation = RunnableSubprocess(f'{self.itksnap} -o {item_path}')
+            # self.parent.threads_pool.start(operation)
+            self.threads.append(QThread())
+            self.operation = SubprocessWorker(f'{self.itksnap} -o {item_path}')
+            self.operation.moveToThread(self.threads[-1])
+            self.threads[-1].started.connect(self.operation.run)
+            self.operation.finished.connect(self.threads[-1].quit)
+            self.operation.finished.connect(self.operation.deleteLater)
+            self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+            self.threads[-1].start()
 
         if action == openSeg:
             logging.debug('Open as segmentation')
-            subprocess.call([self.itksnap, '-s', item_path])
+            # subprocess.call([self.itksnap, '-s', item_path])
+            # operation = RunnableSubprocess(f'{self.itksnap} -s {item_path}')
+            # self.parent.threads_pool.start(operation)
+            self.threads.append(QThread())
+            self.operation = SubprocessWorker(f'{self.itksnap} -s {item_path}')
+            self.operation.moveToThread(self.threads[-1])
+            self.threads[-1].started.connect(self.operation.run)
+            self.operation.finished.connect(self.threads[-1].quit)
+            self.operation.finished.connect(self.operation.deleteLater)
+            self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+            self.threads[-1].start()
 
 
 
@@ -351,6 +475,7 @@ class BidsActions(QWidget):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.change_bids_dir_button = QPushButton("Change BIDS Directory")
         self.change_bids_dir_button.clicked.connect(self.change_bids_dir)
@@ -406,7 +531,8 @@ class BidsActions(QWidget):
 
     def add(self):
         logging.info("add")
-        self.add_win = AddWindow(self)
+        if not hasattr(self, 'add_win'):
+            self.add_win = AddWindow(self)
         if not self.parent.dcm2niix_path:
             # ajouter une fenetre
             path = QFileDialog.getOpenFileName(self, "Select 'dcm2niix.exe' path")[0]
@@ -417,16 +543,21 @@ class BidsActions(QWidget):
 
     def remove(self):
         logging.info("remove")
-        self.rm_win = RemoveWindow(self)
+        if not hasattr(self, 'rm_win'):
+            self.rm_win = RemoveWindow(self)
         self.rm_win.show()
 
     def rename_sub(self):
         logging.info("rename_sub")
-        self.renameSub_win = RenameSubject(self)
+        if not hasattr(self, 'renameSub_win'):
+            self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
 
     def rename_ses(self):
         logging.info("rename_ses")
+        if not hasattr(self, 'renameSes_win'):
+            self.renameSes_win = RenameSession(self)
+        self.renameSes_win.show()
 
     def update_bids(self, parent):
         self.parent = parent
@@ -434,12 +565,14 @@ class BidsActions(QWidget):
 
     def rename_seq(self):
         logging.info("rename_seq")
-        self.renameSeq_win = RenameSequence(self)
+        if not hasattr(self, 'renameSeq_win'):
+            self.renameSeq_win = RenameSequence(self)
         self.renameSeq_win.show()
 
     def update_authors(self):
         logging.info("update_authors")
-        self.updateAuthors_win = UpdateAuthors(self)
+        if not hasattr(self, 'updateAuthors_win'):
+            self.updateAuthors_win = UpdateAuthors(self)
         self.updateAuthors_win.show()
 
 
@@ -449,6 +582,7 @@ class RemoveWindow(QMainWindow):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.setWindowTitle("Remove subject or session")
         self.window = QWidget(self)
@@ -476,12 +610,81 @@ class RemoveWindow(QMainWindow):
     def remove(self):
         subject = self.subject.text()
         session = self.session.text()
-        logging.info(f"Removing sub-{subject} ses-{session}")
-        if subject != "":
-            if session != "":
-                self.bids.delete_session(subject, session)
-            else:
-                self.bids.delete_subject(subject)
+        buttonReply = QMessageBox.question(self, 'Remove subject and/or session', "Do you want to delete the raw dicoms?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if buttonReply == QMessageBox.Yes:
+            logging.info(f"Removing sub-{subject} ses-{session}")
+            if subject != "":
+                if session != "":
+                    self.bids.delete_session(subject, session, delete_sourcedata=True)
+                    # operation = RunnableOperation(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
+                    # self.parent.threads_pool.start(operation)
+                    # self.parent.remove_button.setEnabled(False)
+                    # self.thread = QThread()
+                    # self.operation = OperationWorker(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
+                    # self.operation.moveToThread(self.thread)
+                    # self.thread.started.connect(self.operation.run)
+                    # self.operation.finished.connect(self.thread.quit)
+                    # self.operation.finished.connect(self.operation.deleteLater)
+                    # self.thread.finished.connect(self.thread.deleteLater)
+                    # self.thread.start()
+                    # self.thread.finished.connect(
+                    #     lambda: self.parent.remove_button.setEnabled(True)
+                    # )
+
+                    
+                else:
+                    self.bids.delete_subject(subject, delete_sourcedata=True)
+                    # operation = RunnableOperation(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
+                    # self.parent.threads_pool.start(operation)
+                    # self.parent.remove_button.setEnabled(False)
+                    # self.thread = QThread()
+                    # self.operation = OperationWorker(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
+                    # self.operation.moveToThread(self.thread)
+                    # self.thread.started.connect(self.operation.run)
+                    # self.operation.finished.connect(self.thread.quit)
+                    # self.operation.finished.connect(self.operation.deleteLater)
+                    # self.thread.finished.connect(self.thread.deleteLater)
+                    # self.thread.start()
+                    # self.thread.finished.connect(
+                    #     lambda: self.parent.remove_button.setEnabled(True)
+                    # )
+        else:
+            logging.info(f"Removing sub-{subject} ses-{session} while keeping the dicoms")
+            if subject != "":
+                if session != "":
+                    self.bids.delete_session(subject, session)
+                    # operation = RunnableOperation(self.bids.delete_session, args=[subject, session])
+                    # self.parent.threads_pool.start(operation)
+                    # self.parent.remove_button.setEnabled(False)
+                    # self.thread = QThread()
+                    # self.operation = OperationWorker(self.bids.delete_session, args=[subject, session])
+                    # self.operation.moveToThread(self.thread)
+                    # self.thread.started.connect(self.operation.run)
+                    # self.operation.finished.connect(self.thread.quit)
+                    # self.operation.finished.connect(self.operation.deleteLater)
+                    # self.thread.finished.connect(self.thread.deleteLater)
+                    # self.thread.start()
+                    # self.thread.finished.connect(
+                    #     lambda: self.parent.remove_button.setEnabled(True)
+                    # )
+                else:
+                    self.bids.delete_subject(subject)
+                    # operation = RunnableOperation(self.bids.delete_subject, args=[subject])
+                    # self.parent.threads_pool.start(operation)
+                    # self.parent.remove_button.setEnabled(False)
+                    # self.thread = QThread()
+                    # self.operation = OperationWorker(self.bids.delete_subject, args=[subject])
+                    # self.operation.moveToThread(self.thread)
+                    # self.thread.started.connect(self.operation.run)
+                    # self.operation.finished.connect(self.thread.quit)
+                    # self.operation.finished.connect(self.operation.deleteLater)
+                    # self.thread.finished.connect(self.thread.deleteLater)
+                    # self.thread.start()
+                    # self.thread.finished.connect(
+                    #     lambda: self.parent.remove_button.setEnabled(True)
+                    # )
+                    
+        self.hide()
 
     def center(self):
         qr = self.frameGeometry()
@@ -495,6 +698,7 @@ class AddWindow(QMainWindow):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.setWindowTitle("Add subject or session")
         self.window = QWidget(self)
@@ -505,13 +709,13 @@ class AddWindow(QMainWindow):
 
         self.label = QLabel("Select DICOM folders to add to BIDS directory")
         self.label.setAlignment(Qt.AlignHCenter)
-        self.subject = QLineEdit(self)
-        self.subject.setPlaceholderText('Subject number')
-        self.session = QLineEdit(self)
-        self.session.setPlaceholderText('Session number')
+        # self.subject = QLineEdit(self)
+        # self.subject.setPlaceholderText('Subject number')
+        # self.session = QLineEdit(self)
+        # self.session.setPlaceholderText('Session number')
         self.add_folder_button = QPushButton("Add DICOM Folder")
         self.add_folder_button.clicked.connect(self.add_folder)
-        self.add_files_button = QPushButton("Add DICOM Files")
+        self.add_files_button = QPushButton("Add DICOM zip Files")
         self.add_files_button.clicked.connect(self.add_files)
         self.list_view = QTableWidget()
         self.list_view.setMinimumSize(800,200)
@@ -526,12 +730,12 @@ class AddWindow(QMainWindow):
 
         layout = QGridLayout()
         layout.addWidget(self.label, 0, 0, 1, 2)
-        layout.addWidget(self.subject, 1, 0, 1, 1)
-        layout.addWidget(self.session, 1, 1, 1, 1)
-        layout.addWidget(self.add_folder_button, 2, 0, 1, 1)
-        layout.addWidget(self.add_files_button, 2, 1, 1, 1)
-        layout.addWidget(self.list_view, 3, 0, 1, 2)
-        layout.addWidget(self.add_button, 4, 0, 1, 2)
+        # layout.addWidget(self.subject, 1, 0, 1, 1)
+        # layout.addWidget(self.session, 1, 1, 1, 1)
+        layout.addWidget(self.add_folder_button, 1, 0, 1, 1)
+        layout.addWidget(self.add_files_button, 1, 1, 1, 1)
+        layout.addWidget(self.list_view, 2, 0, 1, 2)
+        layout.addWidget(self.add_button, 3, 0, 1, 2)
 
         self.window.setLayout(layout)
 
@@ -539,15 +743,15 @@ class AddWindow(QMainWindow):
         dicom_folder = str(QFileDialog.getExistingDirectory(self, "Select DICOM folder"))
         rowPosition = len(self.list_to_add)
         self.list_view.insertRow(rowPosition)
-        subject = self.subject.text()
-        session = self.session.text()
-        if len(subject) != 3:
-            subject = None
-        if len(session) != 2:
-            session = None
+        # subject = self.subject.text()
+        # session = self.session.text()
+        # if len(subject) != 3:
+        #     subject = None
+        # if len(session) != 2:
+        #     session = None
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
-        self.list_view.setItem(rowPosition , 1, QTableWidgetItem(subject))
-        self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
+        self.list_view.setItem(rowPosition , 1, QTableWidgetItem(None))
+        self.list_view.setItem(rowPosition , 2, QTableWidgetItem(None))
         # self.list_to_add.append((dicom_folder, subject, session))
 
 
@@ -555,15 +759,15 @@ class AddWindow(QMainWindow):
         dicom_folder = QFileDialog.getOpenFileName(self, 'Select DICOM zip file')[0]
         rowPosition = len(self.list_to_add)
         self.list_view.insertRow(rowPosition)
-        subject = self.subject.text()
-        session = self.session.text()
-        if len(subject) != 3:
-            subject = None
-        if len(session) != 2:
-            session = None
+        # subject = self.subject.text()
+        # session = self.session.text()
+        # if len(subject) != 3:
+        #     subject = None
+        # if len(session) != 2:
+        #     session = None
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
-        self.list_view.setItem(rowPosition , 1, QTableWidgetItem(subject))
-        self.list_view.setItem(rowPosition , 2, QTableWidgetItem(session))
+        self.list_view.setItem(rowPosition , 1, QTableWidgetItem(None))
+        self.list_view.setItem(rowPosition , 2, QTableWidgetItem(None))
         # self.list_to_add.append((dicom_folder, subject, session))
 
     def add(self):
@@ -590,14 +794,36 @@ class AddWindow(QMainWindow):
                                                                                 pat_id      = PATIENT_ID,
                                                                                 session     = SESSION,
                                                                                 return_dicom_series=True)
-                logging.info(f"[INFO] done for patient {pat_id}")
-            except:
-                logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}:')
+                # operation = RunnableOperation(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
+                # self.parent.threads_pool.start(operation)
+                # operation.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
+                # self.parent.add_button.setEnabled(False)
+                # self.thread = QThread()
+                # self.operation = OperationWorker(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
+                # self.operation.moveToThread(self.thread)
+                # self.thread.started.connect(self.operation.run)
+                # self.operation.finished.connect(self.thread.quit)
+                # self.operation.finished.connect(self.operation.deleteLater)
+                # self.thread.finished.connect(self.thread.deleteLater)
+                # self.thread.start()
+                # self.thread.finished.connect(
+                #     lambda: self.parent.add_button.setEnabled(True)
+                # )
+                # self.thread.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
+                # logging.info(f"[INFO] done for patient {pat_id}")
+            except Exception as e:
+                logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
                 # exc_type, exc_obj, exc_tb = sys.exc_info()
                 # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                 # logging.info(exc_type, fname, exc_tb.tb_lineno)
-                traceback.logging.info_exc()
-        logging.info("[INFO] All done.")
+                # traceback.logging.info_exc()
+        
+        self.hide()
+        
+    def end_add(self, last=False):
+        self.parent.parent.bids_metadata.update_metadata()
+        if last:
+            logging.info(f'All done.')
 
     def center(self):
         qr = self.frameGeometry()
@@ -611,6 +837,7 @@ class RenameSubject(QMainWindow):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.setWindowTitle("Rename Subject")
         self.window = QWidget(self)
@@ -636,8 +863,89 @@ class RenameSubject(QMainWindow):
         new_sub = self.new_sub.text()
 
         self.bids.rename_subject(old_sub, new_sub)
+        # operation = RunnableOperation(self.bids.rename_subject, args=[old_sub, new_sub])
+        # self.parent.threads_pool.start(operation)
+        # self.parent.rename_sub_button.setEnabled(False)
+        # self.thread = QThread()
+        # self.operation = OperationWorker(self.bids.rename_subject, args=[old_sub, new_sub])
+        # self.operation.moveToThread(self.thread)
+        # self.thread.started.connect(self.operation.run)
+        # self.operation.finished.connect(self.thread.quit)
+        # self.operation.finished.connect(self.operation.deleteLater)
+        # self.thread.finished.connect(self.thread.deleteLater)
+        # self.thread.start()
+        # self.operation.logHandler.log.signal.connect(self.write_log)
+        # self.thread.finished.connect(
+        #     lambda: self.parent.rename_sub_button.setEnabled(True)
+        # )
         logging.info(f"sub-{old_sub} renamed to sub-{new_sub}")
+        
+        self.hide()
 
+    def center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+    
+    @pyqtSlot(str)
+    def write_log(self, log_text):
+        logging.info(log_text)
+
+class RenameSession(QMainWindow):
+    
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+
+        self.setWindowTitle("Rename Session")
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        self.center()
+        
+        self.sub = QLineEdit(self)
+        self.sub.setPlaceholderText("Subject ID")
+        self.old_ses = QLineEdit(self)
+        self.old_ses.setPlaceholderText("Old Session")
+        self.new_ses = QLineEdit(self)
+        self.new_ses.setPlaceholderText("New Session")
+        self.rename_button = QPushButton("Rename Session")
+        self.rename_button.clicked.connect(self.rename)
+
+        layout = QGridLayout()
+        layout.addWidget(self.sub, 0, 0, 1, 1)
+        layout.addWidget(self.old_ses, 0, 1, 1, 1)
+        layout.addWidget(self.new_ses, 1, 1, 1, 1)
+        layout.addWidget(self.rename_button, 2, 0, 1, 2)
+
+        self.window.setLayout(layout)
+        
+    def rename(self):
+        sub = self.sub.text()
+        old_ses = self.old_ses.text()
+        new_ses = self.new_ses.text()
+        
+        self.bids.rename_session(sub, old_ses, new_ses)
+        # operation = RunnableOperation(self.bids.rename_session, args=[sub, old_ses, new_ses])
+        # self.parent.threads_pool.start(operation)
+        # self.parent.rename_ses_button.setEnabled(False)
+        # self.thread = QThread()
+        # self.operation = OperationWorker(self.bids.rename_session, args=[sub, old_ses, new_ses])
+        # self.operation.moveToThread(self.thread)
+        # self.thread.started.connect(self.operation.run)
+        # self.operation.finished.connect(self.thread.quit)
+        # self.operation.finished.connect(self.operation.deleteLater)
+        # self.thread.finished.connect(self.thread.deleteLater)
+        # self.thread.start()
+        # self.thread.finished.connect(
+        #     lambda: self.parent.rename_ses_button.setEnabled(True)
+        # )
+        logging.info(f"ses-{old_ses} renamed to ses-{new_ses} for sub-{sub}")
+        
+        self.hide()
+        
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
@@ -650,6 +958,7 @@ class RenameSequence(QMainWindow):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.setWindowTitle("Rename Sequence")
         self.window = QWidget(self)
@@ -675,7 +984,23 @@ class RenameSequence(QMainWindow):
         new_seq = self.new_seq.text()
 
         self.bids.rename_sequence(old_seq, new_seq)
+        # operation = RunnableOperation(self.bids.rename_sequence, args=[old_seq, new_seq])
+        # self.parent.threads_pool.start(operation)
+        # self.parent.rename_seq_button.setEnabled(False)
+        # self.thread = QThread()
+        # self.operation = OperationWorker(self.bids.rename_sequence, args=[old_seq, new_seq])
+        # self.operation.moveToThread(self.thread)
+        # self.thread.started.connect(self.operation.run)
+        # self.operation.finished.connect(self.thread.quit)
+        # self.operation.finished.connect(self.operation.deleteLater)
+        # self.thread.finished.connect(self.thread.deleteLater)
+        # self.thread.start()
+        # self.thread.finished.connect(
+        #     lambda: self.parent.rename_seq_button.setEnabled(True)
+        # )
         logging.info(f"old {old_seq} renamed to new {new_seq}")
+        
+        self.hide()
 
     def center(self):
         qr = self.frameGeometry()
@@ -689,6 +1014,7 @@ class UpdateAuthors(QMainWindow):
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.setWindowTitle("Update Authors")
         self.window = QWidget(self)
@@ -713,7 +1039,32 @@ class UpdateAuthors(QMainWindow):
         else:
             authors_list = [authors]
         self.bids.update_authors_to_dataset_description(self.bids.root_dir, authors=authors_list)
+        # operation = RunnableOperation(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
+        # self.parent.threads_pool.start(operation)
+        # self.parent.update_authors_button.setEnabled(False)
+        # self.thread = QThread()
+        # self.operation = OperationWorker(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
+        # logging.debug('OperationWorker instanciated')
+        # self.operation.moveToThread(self.thread)
+        # logging.debug('OperationWorker moved to thread')
+        # self.thread.started.connect(self.operation.run)
+        # logging.debug('Thread started and launching operation.run')
+        # self.operation.finished.connect(self.thread.quit)
+        # self.operation.finished.connect(self.operation.deleteLater)
+        # self.thread.finished.connect(self.thread.deleteLater)
+        # self.thread.start()
+        # self.thread.finished.connect(
+        #     lambda: self.parent.update_authors_button.setEnabled(True)
+        # )
+        # self.thread.finished.connect(lambda: self.end_update())
         logging.info(f"Updating {authors} as BIDS directory authors")
+        # operation.finished.connect(self.end_update)
+        self.parent.parent.bids_metadata.update_metadata()
+        
+        self.hide()
+        
+    def end_update(self):
+        logging.info('Thread ended')
         self.parent.parent.bids_metadata.update_metadata()
 
     def center(self):
@@ -738,6 +1089,8 @@ class BidsDialog(QDialog, QPlainTextEdit):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
 
         self.setMinimumSize(700,300)
 
@@ -771,33 +1124,33 @@ class BidsDialog(QDialog, QPlainTextEdit):
     # def close(self):
     #     sys.stdout = self.stdout
 
-class StreamToLogger(object):
-    """
-    Fake file-like stream object that redirects writes to a logger instance.
-    """
-    def __init__(self, logger, log_level=logging.INFO):
-        self.logger = logger
-        self.log_level = log_level
-        self.linebuf = ''
+# class StreamToLogger(object):
+#     """
+#     Fake file-like stream object that redirects writes to a logger instance.
+#     """
+#     def __init__(self, logger, log_level=logging.INFO):
+#         self.logger = logger
+#         self.log_level = log_level
+#         self.linebuf = ''
 
-    def write(self, buf):
-        temp_linebuf = self.linebuf + buf
-        self.linebuf = ''
-        for line in temp_linebuf.splitlines(True):
-            # From the io.TextIOWrapper docs:
-            #   On output, if newline is None, any '\n' characters written
-            #   are translated to the system default line separator.
-            # By default sys.stdout.write() expects '\n' newlines and then
-            # translates them so this is still cross platform.
-            if line[-1] == '\n':
-                self.logger.log(self.log_level, line.rstrip())
-            else:
-                self.linebuf += line
+#     def write(self, buf):
+#         temp_linebuf = self.linebuf + buf
+#         self.linebuf = ''
+#         for line in temp_linebuf.splitlines(True):
+#             # From the io.TextIOWrapper docs:
+#             #   On output, if newline is None, any '\n' characters written
+#             #   are translated to the system default line separator.
+#             # By default sys.stdout.write() expects '\n' newlines and then
+#             # translates them so this is still cross platform.
+#             if line[-1] == '\n':
+#                 self.logger.log(self.log_level, line.rstrip())
+#             else:
+#                 self.linebuf += line
 
-    def flush(self):
-        if self.linebuf != '':
-            self.logger.log(self.log_level, self.linebuf.rstrip())
-        self.linebuf = ''
+#     def flush(self):
+#         if self.linebuf != '':
+#             self.logger.log(self.log_level, self.linebuf.rstrip())
+#         self.linebuf = ''
 
 # class MyDialog(QDialog, QPlainTextEdit):
 #     def __init__(self, parent=None):
@@ -828,11 +1181,117 @@ class StreamToLogger(object):
 #         logging.warning('that\'s not right')
 #         logging.error('foobar')
 
+# class Signals(QObject):
+#     finished = pyqtSignal()
 
+class RunnableSubprocess(QObject, QRunnable):
+    finished = pyqtSignal()
+    
+    def __init__(self, operation):
+        super().__init__()
+        self.operation = operation
+        # self.signal = Signals()
+        
+    def run(self):
+        subprocess.Popen(self.operation, shell=True).wait()
+        # self.signal.finished.emit()
+        self.finished.emit()
+        
+class SubprocessWorker(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+    
+    def __init__(self, operation):
+        super().__init__()
+        self.operation = operation
+        # self.signal = Signals()
+        self.logger = logging.getLogger("Worker")
+
+        # set up log handler
+        self.logHandler = ThreadLogger()
+        self.logHandler.setFormatter(
+            logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
+        self.logger.addHandler(self.logHandler)
+
+        # set the logging level
+        self.logger.setLevel(logging.DEBUG)
+        
+    def run(self):
+        subprocess.Popen(self.operation, shell=True).wait()
+        # self.signal.finished.emit()
+        self.finished.emit()
+        
+class RunnableOperation(QObject, QRunnable):
+    finished = pyqtSignal()
+    
+    def __init__(self, function, args=[], kwargs={}):
+        super().__init__()
+        self.function = function
+        self.args = args
+        self.kwargs = kwargs
+        # self.signal = Signals()
+        
+    def run(self):
+        self.function(*self.args, **self.kwargs)
+        # self.signal.finished.emit()
+        self.finished.emit()
+        
+class OperationWorker(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+    
+    def __init__(self, function, args=[], kwargs={}):
+        super().__init__()
+        self.function = function
+        self.args = args
+        self.kwargs = kwargs
+        # self.signal = Signals()
+        self.logger = logging.getLogger("Worker")
+
+        # set up log handler
+        self.logHandler = ThreadLogger()
+        self.logHandler.setFormatter(
+            logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
+        self.logger.addHandler(self.logHandler)
+
+        # set the logging level
+        self.logger.setLevel(logging.DEBUG)
+        
+    def run(self):
+        try:
+            # logging.debug('Operation run has been called and is now running')
+            self.function(*self.args, **self.kwargs)
+            # self.signal.finished.emit()
+        except Exception as e:
+            pass
+        self.finished.emit()
+        
+class MyLog(QObject):
+    # create a new Signal
+    # - have to be a static element
+    # - class  has to inherit from QObject to be able to emit signals
+    signal = pyqtSignal(str)
+
+    # not sure if it's necessary to implement this
+    def __init__(self):
+        super().__init__()
+        
+class ThreadLogger(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.log = MyLog()
+
+    # logging.Handler.emit() is intended to be implemented by subclasses
+    def emit(self, record):
+        msg = self.format(record)
+        self.log.signal.emit(msg)
 
 if __name__ == "__main__":
 
-    app = QApplication([])
+    if not QApplication.instance():
+        app = QApplication(sys.argv)
+    else:
+        app = QApplication.instance() 
 
     window = MainWindow()
 

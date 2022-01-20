@@ -4,7 +4,7 @@ modality,modality_bids,acq,acq_bids,ce,ce_bids,run,run_bids,inv,inv_bids,part,pa
 3Plane_Loc,3Plane_Loc,i00025,cor,Gad,gad,,,,,,,,,IGNORED
 AX_REFORMAT,AX_REFORMAT,,,Gad,gad,,,,,,,,,IGNORED
 COR_REFORMAT,COR_REFORMAT,,,Gad,gad,,,,,,,,,IGNORED
-Ax_T2_Propeller,Ax_T2_Propeller,,,Gad,gad,,,,,,,,,IGNORED
+Ax_T2_Propeller,T2w,Ax,ax,Gad,gad,,,,,,,,,anat
 MPRAGE,T1w,_,MPRAGE,Gad,gad,,,,,,,,,anat
 3D_EPI,T2starw,,,Gad,gad,,,,,SWIphase,phase,,,anat
 3D_EPI,T2starw,,,Gad,gad,,,,,_,mag,,,anat
