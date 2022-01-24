@@ -524,7 +524,7 @@ class TransformationTab(QWidget):
         self.name_reg = self.trans_matrix_sequence.split('_')[-1]
         self.name_reg = self.name_reg.replace('0GenericAffine','')
                     
-        self.registration_script()                
+        self.transformation_script()                
                     
     def transformation_script(self):
         logging.info(self.subjects_and_sessions)            
