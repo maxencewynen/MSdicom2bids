@@ -574,6 +574,15 @@ class BidsActions(QWidget):
         if not hasattr(self, 'updateAuthors_win'):
             self.updateAuthors_win = UpdateAuthors(self)
         self.updateAuthors_win.show()
+        
+    def setEnabledButtons(self, enabled):
+        self.change_bids_dir_button.setEnabled(enabled)
+        self.add_button.setEnabled(enabled)
+        self.remove_button.setEnabled(enabled)
+        self.rename_sub_button.setEnabled(enabled)
+        self.rename_ses_button.setEnabled(enabled)
+        self.rename_seq_button.setEnabled(enabled)
+        self.update_authors_button.setEnabled(enabled)
 
 
 class RemoveWindow(QMainWindow):
@@ -615,74 +624,77 @@ class RemoveWindow(QMainWindow):
             logging.info(f"Removing sub-{subject} ses-{session}")
             if subject != "":
                 if session != "":
-                    self.bids.delete_session(subject, session, delete_sourcedata=True)
+                    # self.bids.delete_session(subject, session, delete_sourcedata=True)
                     # operation = RunnableOperation(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
                     # self.parent.threads_pool.start(operation)
-                    # self.parent.remove_button.setEnabled(False)
-                    # self.thread = QThread()
-                    # self.operation = OperationWorker(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
-                    # self.operation.moveToThread(self.thread)
-                    # self.thread.started.connect(self.operation.run)
-                    # self.operation.finished.connect(self.thread.quit)
-                    # self.operation.finished.connect(self.operation.deleteLater)
-                    # self.thread.finished.connect(self.thread.deleteLater)
-                    # self.thread.start()
-                    # self.thread.finished.connect(
-                    #     lambda: self.parent.remove_button.setEnabled(True)
-                    # )
+                    self.parent.setEnabled(False)
+                    self.thread = QThread()
+                    self.operation = OperationWorker(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
+                    self.operation.moveToThread(self.thread)
+                    self.thread.started.connect(self.operation.run)
+                    self.operation.finished.connect(self.thread.quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.thread.finished.connect(self.thread.deleteLater)
+                    self.thread.start()
+                    self.thread.finished.connect(
+                        lambda: self.parent.setEnabled(True)
+                    )
 
                     
                 else:
-                    self.bids.delete_subject(subject, delete_sourcedata=True)
+                    # self.bids.delete_subject(subject, delete_sourcedata=True)
                     # operation = RunnableOperation(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
                     # self.parent.threads_pool.start(operation)
-                    # self.parent.remove_button.setEnabled(False)
-                    # self.thread = QThread()
-                    # self.operation = OperationWorker(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
-                    # self.operation.moveToThread(self.thread)
-                    # self.thread.started.connect(self.operation.run)
-                    # self.operation.finished.connect(self.thread.quit)
-                    # self.operation.finished.connect(self.operation.deleteLater)
-                    # self.thread.finished.connect(self.thread.deleteLater)
-                    # self.thread.start()
-                    # self.thread.finished.connect(
-                    #     lambda: self.parent.remove_button.setEnabled(True)
-                    # )
+                    self.parent.setEnabled(False)
+                    self.thread = QThread()
+                    self.operation = OperationWorker(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
+                    self.operation.moveToThread(self.thread)
+                    self.thread.started.connect(self.operation.run)
+                    self.operation.finished.connect(self.thread.quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.thread.finished.connect(self.thread.deleteLater)
+                    self.operation.logHandler.log.signal.connect(self.write_log)
+                    self.thread.start()
+                    self.thread.finished.connect(
+                        lambda: self.parent.setEnabled(True)
+                    )
         else:
             logging.info(f"Removing sub-{subject} ses-{session} while keeping the dicoms")
             if subject != "":
                 if session != "":
-                    self.bids.delete_session(subject, session)
+                    # self.bids.delete_session(subject, session)
                     # operation = RunnableOperation(self.bids.delete_session, args=[subject, session])
                     # self.parent.threads_pool.start(operation)
-                    # self.parent.remove_button.setEnabled(False)
-                    # self.thread = QThread()
-                    # self.operation = OperationWorker(self.bids.delete_session, args=[subject, session])
-                    # self.operation.moveToThread(self.thread)
-                    # self.thread.started.connect(self.operation.run)
-                    # self.operation.finished.connect(self.thread.quit)
-                    # self.operation.finished.connect(self.operation.deleteLater)
-                    # self.thread.finished.connect(self.thread.deleteLater)
-                    # self.thread.start()
-                    # self.thread.finished.connect(
-                    #     lambda: self.parent.remove_button.setEnabled(True)
-                    # )
+                    self.parent.setEnabled(False)
+                    self.thread = QThread()
+                    self.operation = OperationWorker(self.bids.delete_session, args=[subject, session])
+                    self.operation.moveToThread(self.thread)
+                    self.thread.started.connect(self.operation.run)
+                    self.operation.finished.connect(self.thread.quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.thread.finished.connect(self.thread.deleteLater)
+                    self.operation.logHandler.log.signal.connect(self.write_log)
+                    self.thread.start()
+                    self.thread.finished.connect(
+                        lambda: self.parent.setEnabled(True)
+                    )
                 else:
-                    self.bids.delete_subject(subject)
+                    # self.bids.delete_subject(subject)
                     # operation = RunnableOperation(self.bids.delete_subject, args=[subject])
                     # self.parent.threads_pool.start(operation)
-                    # self.parent.remove_button.setEnabled(False)
-                    # self.thread = QThread()
-                    # self.operation = OperationWorker(self.bids.delete_subject, args=[subject])
-                    # self.operation.moveToThread(self.thread)
-                    # self.thread.started.connect(self.operation.run)
-                    # self.operation.finished.connect(self.thread.quit)
-                    # self.operation.finished.connect(self.operation.deleteLater)
-                    # self.thread.finished.connect(self.thread.deleteLater)
-                    # self.thread.start()
-                    # self.thread.finished.connect(
-                    #     lambda: self.parent.remove_button.setEnabled(True)
-                    # )
+                    self.parent.setEnabled(False)
+                    self.thread = QThread()
+                    self.operation = OperationWorker(self.bids.delete_subject, args=[subject])
+                    self.operation.moveToThread(self.thread)
+                    self.thread.started.connect(self.operation.run)
+                    self.operation.finished.connect(self.thread.quit)
+                    self.operation.finished.connect(self.operation.deleteLater)
+                    self.thread.finished.connect(self.thread.deleteLater)
+                    self.operation.logHandler.log.signal.connect(self.write_log)
+                    self.thread.start()
+                    self.thread.finished.connect(
+                        lambda: self.parent.setEnabled(True)
+                    )
                     
         self.hide()
 
@@ -691,6 +703,10 @@ class RemoveWindow(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+        
+    @pyqtSlot(str)
+    def write_log(self, log_text):
+        logging.info(log_text)
 
 class AddWindow(QMainWindow):
 
@@ -775,48 +791,61 @@ class AddWindow(QMainWindow):
         for i in range(self.list_view.rowCount()):
             self.list_to_add.append((self.list_view.item(i,0).text(), self.list_view.item(i,1).text() if self.list_view.item(i,1).text() != '' else None, self.list_view.item(i,2).text() if self.list_view.item(i,2).text() != '' else None))
 
-        for item in self.list_to_add:
+        # for item in self.list_to_add:
 
-            dicom = item[0]
+        #     dicom = item[0]
 
-            if ".zip" in dicom:
-                directory_to_extract_to = dicom[:-4]
-                with zipfile.ZipFile(dicom, 'r') as zip_ref:
-                    zip_ref.extractall(directory_to_extract_to)
-                dicom = directory_to_extract_to
+        #     if ".zip" in dicom:
+        #         directory_to_extract_to = dicom[:-4]
+        #         with zipfile.ZipFile(dicom, 'r') as zip_ref:
+        #             zip_ref.extractall(directory_to_extract_to)
+        #         dicom = directory_to_extract_to
 
-            DICOM_FOLDER = dicom
-            PATIENT_ID = item[1]
-            SESSION = item[2]
+        #     DICOM_FOLDER = dicom
+        #     PATIENT_ID = item[1]
+        #     SESSION = item[2]
 
-            try:
-                pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
-                                                                                pat_id      = PATIENT_ID,
-                                                                                session     = SESSION,
-                                                                                return_dicom_series=True)
-                # operation = RunnableOperation(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
-                # self.parent.threads_pool.start(operation)
-                # operation.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
-                # self.parent.add_button.setEnabled(False)
-                # self.thread = QThread()
-                # self.operation = OperationWorker(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
-                # self.operation.moveToThread(self.thread)
-                # self.thread.started.connect(self.operation.run)
-                # self.operation.finished.connect(self.thread.quit)
-                # self.operation.finished.connect(self.operation.deleteLater)
-                # self.thread.finished.connect(self.thread.deleteLater)
-                # self.thread.start()
-                # self.thread.finished.connect(
-                #     lambda: self.parent.add_button.setEnabled(True)
-                # )
-                # self.thread.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
-                # logging.info(f"[INFO] done for patient {pat_id}")
-            except Exception as e:
-                logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
-                # exc_type, exc_obj, exc_tb = sys.exc_info()
-                # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                # logging.info(exc_type, fname, exc_tb.tb_lineno)
-                # traceback.logging.info_exc()
+        #     try:
+        #         # pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
+        #         #                                                                 pat_id      = PATIENT_ID,
+        #         #                                                                 session     = SESSION,
+        #         #                                                                 return_dicom_series=True)
+        #         operation = RunnableOperation(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
+        #         self.parent.threads_pool.start(operation)
+        #         operation.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
+        #         self.parent.add_button.setEnabled(False)
+        #         self.thread = QThread()
+        #         self.operation = OperationWorker(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
+        #         self.operation.moveToThread(self.thread)
+        #         self.thread.started.connect(self.operation.run)
+        #         self.operation.finished.connect(self.thread.quit)
+        #         self.operation.finished.connect(self.operation.deleteLater)
+        #         self.thread.finished.connect(self.thread.deleteLater)
+        #         self.thread.start()
+        #         self.thread.finished.connect(
+        #             lambda: self.parent.add_button.setEnabled(True)
+        #         )
+        #         self.thread.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
+        #         # logging.info(f"[INFO] done for patient {pat_id}")
+        #     except Exception as e:
+        #         logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
+        #         # exc_type, exc_obj, exc_tb = sys.exc_info()
+        #         # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        #         # logging.info(exc_type, fname, exc_tb.tb_lineno)
+        #         # traceback.logging.info_exc()
+        
+        # self.parent.setEnabled(False)
+        self.thread = QThread()
+        self.worker = AddWorker(self.bids, self.list_to_add)
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        # self.thread.finished.connect(lambda: self.parent.setEnabled(True))
+        self.thread.finished.connect(lambda last=True: self.end_add(last=True))
+        self.worker.logHandler.log.signal.connect(self.write_log)
+        self.thread.start()
         
         self.hide()
         
@@ -830,6 +859,10 @@ class AddWindow(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+    
+    @pyqtSlot(str)
+    def write_log(self, log_text):
+        logging.info(log_text)
 
 class RenameSubject(QMainWindow):
 
@@ -862,22 +895,22 @@ class RenameSubject(QMainWindow):
         old_sub = self.old_sub.text()
         new_sub = self.new_sub.text()
 
-        self.bids.rename_subject(old_sub, new_sub)
+        # self.bids.rename_subject(old_sub, new_sub)
         # operation = RunnableOperation(self.bids.rename_subject, args=[old_sub, new_sub])
         # self.parent.threads_pool.start(operation)
-        # self.parent.rename_sub_button.setEnabled(False)
-        # self.thread = QThread()
-        # self.operation = OperationWorker(self.bids.rename_subject, args=[old_sub, new_sub])
-        # self.operation.moveToThread(self.thread)
-        # self.thread.started.connect(self.operation.run)
-        # self.operation.finished.connect(self.thread.quit)
-        # self.operation.finished.connect(self.operation.deleteLater)
-        # self.thread.finished.connect(self.thread.deleteLater)
-        # self.thread.start()
-        # self.operation.logHandler.log.signal.connect(self.write_log)
-        # self.thread.finished.connect(
-        #     lambda: self.parent.rename_sub_button.setEnabled(True)
-        # )
+        self.parent.setEnabled(False)
+        self.thread = QThread()
+        self.operation = OperationWorker(self.bids.rename_subject, args=[old_sub, new_sub])
+        self.operation.moveToThread(self.thread)
+        self.thread.started.connect(self.operation.run)
+        self.operation.finished.connect(self.thread.quit)
+        self.operation.finished.connect(self.operation.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.operation.logHandler.log.signal.connect(self.write_log)
+        self.thread.start()
+        self.thread.finished.connect(
+            lambda: self.parent.setEnabled(True)
+        )
         logging.info(f"sub-{old_sub} renamed to sub-{new_sub}")
         
         self.hide()
@@ -927,21 +960,22 @@ class RenameSession(QMainWindow):
         old_ses = self.old_ses.text()
         new_ses = self.new_ses.text()
         
-        self.bids.rename_session(sub, old_ses, new_ses)
+        # self.bids.rename_session(sub, old_ses, new_ses)
         # operation = RunnableOperation(self.bids.rename_session, args=[sub, old_ses, new_ses])
         # self.parent.threads_pool.start(operation)
-        # self.parent.rename_ses_button.setEnabled(False)
-        # self.thread = QThread()
-        # self.operation = OperationWorker(self.bids.rename_session, args=[sub, old_ses, new_ses])
-        # self.operation.moveToThread(self.thread)
-        # self.thread.started.connect(self.operation.run)
-        # self.operation.finished.connect(self.thread.quit)
-        # self.operation.finished.connect(self.operation.deleteLater)
-        # self.thread.finished.connect(self.thread.deleteLater)
-        # self.thread.start()
-        # self.thread.finished.connect(
-        #     lambda: self.parent.rename_ses_button.setEnabled(True)
-        # )
+        self.parent.setEnabled(False)
+        self.thread = QThread()
+        self.operation = OperationWorker(self.bids.rename_session, args=[sub, old_ses, new_ses])
+        self.operation.moveToThread(self.thread)
+        self.thread.started.connect(self.operation.run)
+        self.operation.finished.connect(self.thread.quit)
+        self.operation.finished.connect(self.operation.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.operation.logHandler.log.signal.connect(self.write_log)
+        self.thread.start()
+        self.thread.finished.connect(
+            lambda: self.parent.setEnabled(True)
+        )
         logging.info(f"ses-{old_ses} renamed to ses-{new_ses} for sub-{sub}")
         
         self.hide()
@@ -951,6 +985,10 @@ class RenameSession(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+    
+    @pyqtSlot(str)
+    def write_log(self, log_text):
+        logging.info(log_text)
 
 class RenameSequence(QMainWindow):
 
@@ -983,21 +1021,22 @@ class RenameSequence(QMainWindow):
         old_seq = self.old_seq.text()
         new_seq = self.new_seq.text()
 
-        self.bids.rename_sequence(old_seq, new_seq)
+        # self.bids.rename_sequence(old_seq, new_seq)
         # operation = RunnableOperation(self.bids.rename_sequence, args=[old_seq, new_seq])
         # self.parent.threads_pool.start(operation)
-        # self.parent.rename_seq_button.setEnabled(False)
-        # self.thread = QThread()
-        # self.operation = OperationWorker(self.bids.rename_sequence, args=[old_seq, new_seq])
-        # self.operation.moveToThread(self.thread)
-        # self.thread.started.connect(self.operation.run)
-        # self.operation.finished.connect(self.thread.quit)
-        # self.operation.finished.connect(self.operation.deleteLater)
-        # self.thread.finished.connect(self.thread.deleteLater)
-        # self.thread.start()
-        # self.thread.finished.connect(
-        #     lambda: self.parent.rename_seq_button.setEnabled(True)
-        # )
+        self.parent.setEnabled(False)
+        self.thread = QThread()
+        self.operation = OperationWorker(self.bids.rename_sequence, args=[old_seq, new_seq])
+        self.operation.moveToThread(self.thread)
+        self.thread.started.connect(self.operation.run)
+        self.operation.finished.connect(self.thread.quit)
+        self.operation.finished.connect(self.operation.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.operation.logHandler.log.signal.connect(self.write_log)
+        self.thread.start()
+        self.thread.finished.connect(
+            lambda: self.parent.setEnabled(True)
+        )
         logging.info(f"old {old_seq} renamed to new {new_seq}")
         
         self.hide()
@@ -1007,6 +1046,10 @@ class RenameSequence(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+    
+    @pyqtSlot(str)
+    def write_log(self, log_text):
+        logging.info(log_text)
 
 class UpdateAuthors(QMainWindow):
 
@@ -1038,25 +1081,26 @@ class UpdateAuthors(QMainWindow):
             authors_list = authors.split(',')
         else:
             authors_list = [authors]
-        self.bids.update_authors_to_dataset_description(self.bids.root_dir, authors=authors_list)
+        # self.bids.update_authors_to_dataset_description(self.bids.root_dir, authors=authors_list)
         # operation = RunnableOperation(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
         # self.parent.threads_pool.start(operation)
-        # self.parent.update_authors_button.setEnabled(False)
-        # self.thread = QThread()
-        # self.operation = OperationWorker(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
-        # logging.debug('OperationWorker instanciated')
-        # self.operation.moveToThread(self.thread)
-        # logging.debug('OperationWorker moved to thread')
-        # self.thread.started.connect(self.operation.run)
-        # logging.debug('Thread started and launching operation.run')
-        # self.operation.finished.connect(self.thread.quit)
-        # self.operation.finished.connect(self.operation.deleteLater)
-        # self.thread.finished.connect(self.thread.deleteLater)
-        # self.thread.start()
-        # self.thread.finished.connect(
-        #     lambda: self.parent.update_authors_button.setEnabled(True)
-        # )
-        # self.thread.finished.connect(lambda: self.end_update())
+        self.parent.setEnabled(False)
+        self.thread = QThread()
+        self.operation = OperationWorker(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
+        logging.debug('OperationWorker instanciated')
+        self.operation.moveToThread(self.thread)
+        logging.debug('OperationWorker moved to thread')
+        self.thread.started.connect(self.operation.run)
+        logging.debug('Thread started and launching operation.run')
+        self.operation.finished.connect(self.thread.quit)
+        self.operation.finished.connect(self.operation.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.operation.logHandler.log.signal.connect(self.write_log)
+        self.thread.start()
+        self.thread.finished.connect(
+            lambda: self.parent.setEnabled(True)
+        )
+        self.thread.finished.connect(lambda: self.end_update())
         logging.info(f"Updating {authors} as BIDS directory authors")
         # operation.finished.connect(self.end_update)
         self.parent.parent.bids_metadata.update_metadata()
@@ -1072,6 +1116,10 @@ class UpdateAuthors(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+    
+    @pyqtSlot(str)
+    def write_log(self, log_text):
+        logging.info(log_text)
 
 
 class QTextEditLogger(logging.Handler):
@@ -1257,6 +1305,8 @@ class OperationWorker(QObject):
         # set the logging level
         self.logger.setLevel(logging.DEBUG)
         
+        self.kwargs['logger'] = self.logger
+        
     def run(self):
         try:
             # logging.debug('Operation run has been called and is now running')
@@ -1285,6 +1335,57 @@ class ThreadLogger(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         self.log.signal.emit(msg)
+        
+class AddWorker(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+    
+    def __init__(self, bids, list_to_add):
+        super().__init__()
+        self.bids = bids
+        self.list_to_add = list_to_add
+        
+        # self.signal = Signals()
+        self.logger = logging.getLogger("Worker")
+
+        # set up log handler
+        self.logHandler = ThreadLogger()
+        self.logHandler.setFormatter(
+            logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
+        self.logger.addHandler(self.logHandler)
+
+        # set the logging level
+        self.logger.setLevel(logging.DEBUG)
+        
+    def run(self):
+        for item in self.list_to_add:
+
+            dicom = item[0]
+
+            if ".zip" in dicom:
+                directory_to_extract_to = dicom[:-4]
+                with zipfile.ZipFile(dicom, 'r') as zip_ref:
+                    zip_ref.extractall(directory_to_extract_to)
+                dicom = directory_to_extract_to
+
+            DICOM_FOLDER = dicom
+            PATIENT_ID = item[1]
+            SESSION = item[2]
+
+            try:
+                pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
+                                                                                pat_id      = PATIENT_ID,
+                                                                                session     = SESSION,
+                                                                                return_dicom_series=True, logger=self.logger)
+                
+                self.logger.info(f"[INFO] done for patient {pat_id}")
+            except Exception as e:
+                self.logger.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
+                # exc_type, exc_obj, exc_tb = sys.exc_info()
+                # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                # logging.info(exc_type, fname, exc_tb.tb_lineno)
+                # traceback.logging.info_exc()
+        self.finished.emit()
 
 if __name__ == "__main__":
 
