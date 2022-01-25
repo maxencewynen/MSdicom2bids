@@ -194,16 +194,20 @@ class BIDSHandler:
     
     @staticmethod
     def add_dataset_description_jsons(bids_dir, logger=logging):
-        dataset_description = { 
-        	"Name": "dataset", 
-        	"BIDSVersion":  "1.2.2", 
-        	"PipelineDescription": {
-        		"Name": "dataset"
-        	}
-        }
-        with open(pjoin(bids_dir, 'dataset_description.json'), 'w') as fp:
-            json.dump(dataset_description, fp)
+        if not pexists(pjoin(bids_dir, 'dataset_description.json')):
+            dataset_description = { 
+            	"Name": "dataset", 
+            	"BIDSVersion":  "1.2.2", 
+            	"PipelineDescription": {
+            		"Name": "dataset"
+            	}
+            }
+            with open(pjoin(bids_dir, 'dataset_description.json'), 'w') as fp:
+                json.dump(dataset_description, fp)
         
+        else:
+            with open(pjoin(bids_dir, 'dataset_description.json')) as dd:
+                dataset_description = json.load(dd)
 
         for subdir,_,_ in os.walk(bids_dir):
             if subdir.endswith('derivatives'):
@@ -713,7 +717,7 @@ class BIDSHandler:
                                 i = i+1
                     break
                                     
-            if bids_sequence_name['MRI_type'] != 'IGNORED':
+            if bids_sequence_name.get('MRI_type') != None and bids_sequence_name.get('MRI_type') != 'IGNORED':
                 bids_filename = f'sub-{pat_id}_ses-{session}_'
                 for key in bids_sequence_name.keys():
                     if key not in ['modality_bids', 'MRI_type']:

@@ -14,16 +14,9 @@ import zipfile
 
 dicom2niix_path = "dcm2niix"
 
-list_dicoms = ["/media/stluc/ColinVDB/missing R4/AU0032U",
-            "/media/stluc/ColinVDB/missing R4/BR7990B",
-            "/media/stluc/ColinVDB/missing R4/BW2113R",
-            "/media/stluc/ColinVDB/missing R4/HT3354B",
-            "/media/stluc/ColinVDB/missing R4/JY1098S",
-            "/media/stluc/ColinVDB/missing R4/M71666S",
-            "/media/stluc/ColinVDB/missing R4/P41675J",
-            "/media/stluc/ColinVDB/missing R4/R81813P"]
+list_dicoms = ["/home/stluc/Downloads/sub-131/DICOM"]
 
-bidshandler = BIDSHandler(root_dir=r"/media/stluc/ColinVDB/DISSECT_MS/BIDS_R4", dicom2niix_path=dicom2niix_path)
+bidshandler = BIDSHandler(root_dir=r"/home/stluc/Data/BIDS_test", dicom2niix_path=dicom2niix_path)
 
 pat_id = 0
 
@@ -36,8 +29,8 @@ for dicom in list_dicoms:
         dicom = directory_to_extract_to
     
     DICOM_FOLDER = dicom
-    PATIENT_ID = None
-    SESSION = None
+    PATIENT_ID = '131'
+    SESSION = '01'
     
     try:
         pat_id, session, dicom_series = bidshandler.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER, 

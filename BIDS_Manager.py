@@ -54,6 +54,9 @@ import pandas as pd
 import platform
 import json
 from bids_validator import BIDSValidator
+import faulthandler
+
+faulthandler.enable()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -108,6 +111,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon('bids_icon.png'))
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
+        self.window.closeEvent = self.closeEvent
         
         self.center()
 
@@ -153,6 +157,12 @@ class MainWindow(QMainWindow):
         self.move(qr.topLeft())
 
     def closeEvent(self, event):
+        # time.sleep(3)
+        memory_df = pd.DataFrame(self.memory, index=[0])
+        memory_df.to_pickle('memory.xz')
+    
+    def close(self):
+        # time.sleep(3)
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
 
@@ -227,13 +237,13 @@ class MainWindow(QMainWindow):
 
 #         logging.info(self.folderpath)
 
-    def closeEvent(self, event):
-        sys.stdout = self.sys_stdout
-        sys.stderr = self.sys_stderr
+    # def closeEvent(self, event):
+    #     sys.stdout = self.sys_stdout
+    #     sys.stderr = self.sys_stderr
 
-    def close(self):
-        sys.stdout = self.sys_stdout
-        sys.stderr = self.sys_stderr
+    # def close(self):
+    #     sys.stdout = self.sys_stdout
+    #     sys.stderr = self.sys_stderr
         
 
 class BidsDirView(QWidget):
@@ -531,8 +541,9 @@ class BidsActions(QWidget):
 
     def add(self):
         logging.info("add")
-        if not hasattr(self, 'add_win'):
-            self.add_win = AddWindow(self)
+        if hasattr(self, 'add_win'):
+            del self.add_win
+        self.add_win = AddWindow(self)
         if not self.parent.dcm2niix_path:
             # ajouter une fenetre
             path = QFileDialog.getOpenFileName(self, "Select 'dcm2niix.exe' path")[0]
@@ -543,20 +554,23 @@ class BidsActions(QWidget):
 
     def remove(self):
         logging.info("remove")
-        if not hasattr(self, 'rm_win'):
-            self.rm_win = RemoveWindow(self)
+        if hasattr(self, 'rm_win'):
+            del self.rm_win
+        self.rm_win = RemoveWindow(self)
         self.rm_win.show()
 
     def rename_sub(self):
         logging.info("rename_sub")
-        if not hasattr(self, 'renameSub_win'):
-            self.renameSub_win = RenameSubject(self)
+        if hasattr(self, 'renameSub_win'):
+            del self.renameSub_win
+        self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
 
     def rename_ses(self):
         logging.info("rename_ses")
-        if not hasattr(self, 'renameSes_win'):
-            self.renameSes_win = RenameSession(self)
+        if hasattr(self, 'renameSes_win'):
+            del self.renameSes_win
+        self.renameSes_win = RenameSession(self)
         self.renameSes_win.show()
 
     def update_bids(self, parent):
@@ -565,14 +579,16 @@ class BidsActions(QWidget):
 
     def rename_seq(self):
         logging.info("rename_seq")
-        if not hasattr(self, 'renameSeq_win'):
-            self.renameSeq_win = RenameSequence(self)
+        if hasattr(self, 'renameSeq_win'):
+            del self.renameSeq_win
+        self.renameSeq_win = RenameSequence(self)
         self.renameSeq_win.show()
 
     def update_authors(self):
         logging.info("update_authors")
-        if not hasattr(self, 'updateAuthors_win'):
-            self.updateAuthors_win = UpdateAuthors(self)
+        if hasattr(self, 'updateAuthors_win'):
+            del self.updateAuthors_win
+        self.updateAuthors_win = UpdateAuthors(self)
         self.updateAuthors_win.show()
         
     def setEnabledButtons(self, enabled):
@@ -834,7 +850,7 @@ class AddWindow(QMainWindow):
         #         # logging.info(exc_type, fname, exc_tb.tb_lineno)
         #         # traceback.logging.info_exc()
         
-        # self.parent.setEnabled(False)
+        self.parent.setEnabled(False)
         self.thread = QThread()
         self.worker = AddWorker(self.bids, self.list_to_add)
         self.worker.moveToThread(self.thread)
@@ -842,9 +858,9 @@ class AddWindow(QMainWindow):
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.thread.finished.connect(lambda: self.parent.setEnabled(True))
-        self.thread.finished.connect(lambda last=True: self.end_add(last=True))
+        self.thread.finished.connect(lambda: self.parent.setEnabled(True))
         self.worker.logHandler.log.signal.connect(self.write_log)
+        self.thread.finished.connect(lambda last=True: self.end_add(last=True))
         self.thread.start()
         
         self.hide()
@@ -1393,6 +1409,8 @@ if __name__ == "__main__":
         app = QApplication(sys.argv)
     else:
         app = QApplication.instance() 
+    
+    # app = QApplication(sys.argv)
 
     window = MainWindow()
 
