@@ -47,11 +47,19 @@ class BIDSHandler:
         
         self.wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
         
-    def addLoggerHandler(self, logger_handler):
+    def addLoggerHandler(self, logger_handler, logger=logging):
         self.logger.addHandler(logger_handler)
 
-    def setDicom2niixPath(self, dcm2niix_path):
+    def setDicom2niixPath(self, dcm2niix_path, logger=logging):
         self.dicom2niix_path = dcm2niix_path
+        
+    def update_number_of_subjects(self, logger=logging):
+        all_directories = [x for x in next(os.walk(self.root_dir))[1]]
+        all_subj_dir = []
+        for d in all_directories:
+            if d.find('sub-') == 0:
+                all_subj_dir.append(d)
+        self.number_of_subjects = len(all_subj_dir)
 
     @staticmethod
     def rename(series, filenames, path, logger=logging):
@@ -106,7 +114,7 @@ class BIDSHandler:
         return "\033[1m" + string + "\033[0m"
 
     @staticmethod
-    def mkdir_if_not_exists(dirpath):
+    def mkdir_if_not_exists(dirpath, logger=logging):
         if not pexists(dirpath):
             os.mkdir(dirpath)
 
@@ -141,7 +149,7 @@ class BIDSHandler:
             if convert:
                 # logger.info("\n\n>>> CALLED <<<")
                 # logger.info(' '.join(["dicom2niix", '-f', "\"%f_%p_%t_%s\"", "-p",
-                #                  "y", "-z", "y", path]))
+                #                   "y", "-z", "y", p1ath]))
                 subprocess.call([self.dicom2niix_path, '-f', "\"%f_%p_%t_%s\"",
                                   "-p", "y", "-z", "y", path])
             # if "." not in files[0] or not any([ext in file for ext in wrong_extensions]):
@@ -158,7 +166,7 @@ class BIDSHandler:
 
     @staticmethod
     def mkdirs_if_not_exist(root_dir, directories=["sourcedata",
-                                                   "derivatives"]):
+                                                   "derivatives"], logger=logging):
 
         assert pexists(root_dir), f"Root directory {root_dir} does not exist."
 
@@ -189,7 +197,7 @@ class BIDSHandler:
     #                                       derivatives,
     #                                       registrations)
     
-    def make_directories(self, pat_id=None, session=None):
+    def make_directories(self, pat_id=None, session=None, logger=logging):
         return self.make_directories_from(self.root_dir, pat_id, session)
     
     @staticmethod
@@ -220,13 +228,14 @@ class BIDSHandler:
                             
     @staticmethod
     def update_authors_to_dataset_description(bids_dir, authors=[], logger=logging):
+        logger.debug('Test to see if it is fucked !')
         with open(pjoin(bids_dir, 'dataset_description.json')) as dd:
             dataset_description = json.load(dd)
         dataset_description['Authors'] = authors
         with open(pjoin(bids_dir, 'dataset_description.json'), 'w') as dd:
             json.dump(dataset_description, dd)
 
-    def get_dataset_description(self):
+    def get_dataset_description(self, logger=logging):
         try:
             with open(pjoin(self.root_dir, 'dataset_description.json')) as dd:
                 try:
@@ -374,7 +383,7 @@ class BIDSHandler:
     #     return pat_id, session
     
     @staticmethod
-    def make_directories_from(bids_dir, pat_id=None, session=None):
+    def make_directories_from(bids_dir, pat_id=None, session=None, logger=logging):
 
         BIDSHandler.mkdirs_if_not_exist(bids_dir, directories=["sourcedata", "derivatives"])
 
@@ -438,6 +447,7 @@ class BIDSHandler:
         else:
             logger.info("[Exception] Cannot remove directory that does not exists:")
             logger.info(f"\t{dirpath}")
+            pass
 
     def delete_subject(self, pat_id, delete_sourcedata=False, logger=logging):
         patient_id = None
@@ -739,7 +749,7 @@ class BIDSHandler:
                             
                                 
     @staticmethod
-    def delete_nii_json_in_dicomdir(dicom_series):
+    def delete_nii_json_in_dicomdir(dicom_series, logger=logging):
         for path, series in dicom_series:
             for file in os.listdir(path):
                 if file.endswith(".nii.gz") or file.endswith(".json"):
@@ -864,23 +874,25 @@ class BIDSHandler:
         session = None if session is None else str(int(session)).zfill(2)
 
         # Convert all DICOMs
-        dicom_series = self.convert_all_dicoms(dicomfolder)
+        dicom_series = self.convert_all_dicoms(dicomfolder, logger=logger)
 
         # Create directories in the BIDS file structure by giving an incremental id
         # pat_id, session = make_directories(bids_dir,pat_id=None,session=None)
         # To specify the patient id:
-        pat_id, session = self.make_directories(pat_id=pat_id,session=session)
+        logger.debug('make directories ?')
+        pat_id, session = self.make_directories(pat_id=pat_id,session=session, logger=logger)
+        logger.debug('make directories !')
         # To specify the patient id and session:
         # pat_id, session = make_directories(bids_dir,pat_id='ID_TO_SPECIFY',session='SESSION_TO_SPECIFY')
 
         # Rename and move all (interesting) converted files into the bids directory
-        self.rename_and_move_nifti(dicom_series, pat_id, session)
+        self.rename_and_move_nifti(dicom_series, pat_id, session, logger=logger)
 
-        self.copy_dicomfolder_to_sourcedata(dicomfolder, pat_id, session)
+        self.copy_dicomfolder_to_sourcedata(dicomfolder, pat_id, session, logger=logger)
 
         # pat_name, pat_date = self.separate_dicoms(dicomfolder, pat_id, session)
 
-        self.anonymisation(pat_id, session)
+        self.anonymisation(pat_id, session, logger=logger)
         
         logger.info(f"[INFO] done for patient {pat_id}")
 
@@ -1059,6 +1071,7 @@ class BIDSHandler:
             else:
                 if f'ses-{old_ses}' not in participants.keys():
                     logger.error(f'Subject {old_sub} does not have a session {old_ses}')
+                    pass
                 else:
                     if new_ses == '':
                         del participants[f'ses-{old_ses}'][key_num]

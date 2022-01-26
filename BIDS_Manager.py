@@ -23,7 +23,8 @@ from PyQt5.QtCore import (QSize,
                           pyqtSignal, 
                           pyqtSlot,
                           QRunnable, 
-                          QThreadPool)
+                          QThreadPool, 
+                          QProcess)
 from PyQt5.QtWidgets import (QDesktopWidget, 
                              QApplication, 
                              QWidget, 
@@ -465,6 +466,7 @@ class BidsMetadata(QWidget):
 
     def update_metadata(self):
         self.bids = self.parent.bids
+        self.bids.update_number_of_subjects()
         self.number_of_subjects.setText(f"Number of subjects: {self.bids.number_of_subjects}")
         dataset_description = self.bids.get_dataset_description()
         bids_version = dataset_description.get('BIDSVersion')
@@ -858,17 +860,17 @@ class AddWindow(QMainWindow):
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.finished.connect(lambda: self.parent.setEnabled(True))
         self.worker.logHandler.log.signal.connect(self.write_log)
-        self.thread.finished.connect(lambda last=True: self.end_add(last=True))
+        # self.thread.finished.connect(lambda: self.parent.setEnabled(True))
+        self.thread.finished.connect(lambda: self.end_add())
         self.thread.start()
         
         self.hide()
         
-    def end_add(self, last=False):
+    def end_add(self):
         self.parent.parent.bids_metadata.update_metadata()
-        if last:
-            logging.info(f'All done.')
+        logging.info(f'All done.')
+        self.parent.setEnabled(True)
 
     def center(self):
         qr = self.frameGeometry()
@@ -1160,7 +1162,7 @@ class BidsDialog(QDialog, QPlainTextEdit):
 
         logTextBox = QTextEditLogger(self)
         logTextBox.setFormatter(logging.Formatter('[%(levelname)s] - %(message)s'))
-        self.parent.bids.addLoggerHandler(logTextBox)
+        self.bids.addLoggerHandler(logTextBox)
         # logger.addHandler(logTextBox)
         # logger.setLevel(logging.DEBUG)
         # self.stdout = sys.stdout
@@ -1187,6 +1189,62 @@ class BidsDialog(QDialog, QPlainTextEdit):
 
     # def close(self):
     #     sys.stdout = self.stdout
+
+# class QTextEditLogger(logging.Handler):
+#     def __init__(self, parent):
+#         super().__init__()
+#         self.widget = QPlainTextEdit(parent)
+#         self.widget.setReadOnly(True)
+
+#     def emit(self, record):
+#         msg = self.format(record)
+#         self.widget.appendPlainText(msg)
+
+
+# class BidsDialog(QDialog):
+#     def __init__(self, parent):
+#         super().__init__()
+#         self.parent = parent
+#         self.bids = self.parent.bids
+        
+#         self.setMinimumSize(700,300)
+
+#         # Setup logging here:
+#         self.logTextBox = QTextEditLogger(self)
+#         self.logTextBox.setFormatter(
+#             logging.Formatter("%(levelname)s - %(message)s")
+#         )
+#         logging.getLogger().addHandler(self.logTextBox)
+#         logging.getLogger().setLevel(logging.DEBUG)
+
+#         # self._button = QtWidgets.QPushButton()
+#         # self._button.setText("Start")
+
+#         layout = QVBoxLayout(self)
+#         layout.addWidget(self.logTextBox.widget)
+#         # layout.addWidget(self._button)
+
+#         # self._button.clicked.connect(self.test)
+
+#         self.process = QProcess()
+#         self.process.readyReadStandardOutput.connect(
+#             self.handle_readyReadStandardOutput
+#         )
+#         # self.process.started.connect(lambda: print("Started!"))
+#         # self.process.finished.connect(lambda: print("Finished!"))
+
+#     # def test(self):
+#     #     logging.debug("damn, a bug")
+#     #     logging.info("something to remember")
+#     #     logging.warning("that's not right")
+#     #     logging.error("foobar")
+
+#     #     script = os.path.join(CURRENT_DIR, "another_module.py")
+#     #     self.process.start(sys.executable, [script])
+
+#     def handle_readyReadStandardOutput(self):
+#         text = self.process.readAllStandardOutput().data().decode()
+#         self.logTextBox.widget.appendPlainText(text.strip())
 
 # class StreamToLogger(object):
 #     """
@@ -1389,18 +1447,19 @@ class AddWorker(QObject):
             SESSION = item[2]
 
             try:
-                pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
-                                                                                pat_id      = PATIENT_ID,
-                                                                                session     = SESSION,
-                                                                                return_dicom_series=True, logger=self.logger)
+                self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
+                                                    pat_id      = PATIENT_ID,
+                                                    session     = SESSION,
+                                                    return_dicom_series=True, logger=self.logger)
                 
-                self.logger.info(f"[INFO] done for patient {pat_id}")
+                # logging.info(f"[INFO] done for patient {pat_id}")
             except Exception as e:
-                self.logger.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
+                # logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
                 # exc_type, exc_obj, exc_tb = sys.exc_info()
                 # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                 # logging.info(exc_type, fname, exc_tb.tb_lineno)
                 # traceback.logging.info_exc()
+                pass
         self.finished.emit()
 
 if __name__ == "__main__":
