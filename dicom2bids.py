@@ -20,6 +20,10 @@ from pydicom import dcmread
 import logging
 import sys
 
+from tqdm.auto import tqdm
+from my_logging import setup_logging
+import time
+
 class BIDSHandler:
     def __init__(self, root_dir, dicom2niix_path="dcm2niix", logger=None):
         self.root_dir = root_dir
@@ -38,9 +42,18 @@ class BIDSHandler:
                 all_subj_dir.append(d)
         self.number_of_subjects = len(all_subj_dir)
         
-        logging.root.handlers = []
-        logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
-        self.logger = logging.getLogger()
+        # logging.root.handlers = []
+        # logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
+        # self.logger = logging.getLogger()
+# =============================================================================
+#         Newlogging
+# =============================================================================
+        setup_logging('dicom2bids')
+        self.logger = logging.getLogger('dicom2bids')
+        self.logger.setLevel(logging.DEBUG)
+# =============================================================================
+# 
+# =============================================================================
         
         self.sequences_df = pd.read_csv('sequences.csv')
         self.sequences_df.fillna('', inplace=True)
@@ -138,13 +151,13 @@ class BIDSHandler:
 
         """
         directory = pjoin(directory)
-        logger.info("[INFO] Starting to convert ...")
+        logging.info("[INFO] Starting to convert ...")
 
         all_sequences = []
         for subdir, dirs, files in os.walk(directory):
             if len(dirs) !=0 or len(files)< 10:
                 continue
-            logger.info(f"SUBDIR: {subdir}\tDIRS: {dirs}")#\nFILES: {files}\n")
+            logging.info(f"SUBDIR: {subdir}\tDIRS: {dirs}")#\nFILES: {files}\n")
             path = os.path.normpath(subdir)
             if convert:
                 # logger.info("\n\n>>> CALLED <<<")
@@ -160,8 +173,8 @@ class BIDSHandler:
                         all_sequences.append((path, file.replace('.nii.gz', '')))
         all_sequences = [(x[0].replace('\\', '/'),x[1]) for x in all_sequences]
 
-        logger.info("[INFO] Converted dicom files to")
-        logger.info(f"{BIDSHandler.bold(str(len(all_sequences)))} compressed nifti")
+        logging.info("[INFO] Converted dicom files to")
+        logging.info(f"{BIDSHandler.bold(str(len(all_sequences)))} compressed nifti")
         return all_sequences
 
     @staticmethod
@@ -228,7 +241,7 @@ class BIDSHandler:
                             
     @staticmethod
     def update_authors_to_dataset_description(bids_dir, authors=[], logger=logging):
-        logger.debug('Test to see if it is fucked !')
+        logging.debug('Test to see if it is fucked !')
         with open(pjoin(bids_dir, 'dataset_description.json')) as dd:
             dataset_description = json.load(dd)
         dataset_description['Authors'] = authors
@@ -445,8 +458,8 @@ class BIDSHandler:
         if pexists(dirpath):
             rmtree(dirpath)
         else:
-            logger.info("[Exception] Cannot remove directory that does not exists:")
-            logger.info(f"\t{dirpath}")
+            logging.info("[Exception] Cannot remove directory that does not exists:")
+            logging.info(f"\t{dirpath}")
             pass
 
     def delete_subject(self, pat_id, delete_sourcedata=False, logger=logging):
@@ -455,12 +468,12 @@ class BIDSHandler:
             try:
                 participants = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
             except FileNotFoundError: 
-                logger.error('participants.tsv does not exists')
+                logging.error('participants.tsv does not exists')
                 return
             try:
                 key_num = list(participants['participant_id'].values()).index(f'sub-{pat_id}')
             except ValueError:
-                logger.error('sub-{pat_id} is not present in the database (participants.tsv')
+                logging.error('sub-{pat_id} is not present in the database (participants.tsv')
                 return
             
             patient_id = participants['patient_id'][key_num]
@@ -492,12 +505,12 @@ class BIDSHandler:
             try:
                 participants = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
             except FileNotFoundError: 
-                logger.error('participants.tsv does not exists')
+                logging.error('participants.tsv does not exists')
                 return
             try:
                 key_num = list(participants['participant_id'].values()).index(f'sub-{pat_id}')
             except ValueError:
-                logger.error('sub-{pat_id} is not present in the database (participants.tsv')
+                logging.error('sub-{pat_id} is not present in the database (participants.tsv')
                 return
             
             patient_id = participants['patient_id'][key_num]
@@ -643,11 +656,11 @@ class BIDSHandler:
     def rename_and_move_nifti(self, dicom_series, pat_id, session='01', logger=logging):
 
         def move_all(path, filename, file_extensions, dest_dir, new_filename):
-            logger.info(filename)
+            logging.info(filename)
             for file_extension in file_extensions:
                 if pexists(pjoin(path, f"{filename}{file_extension}")):
                     if pexists(pjoin(dest_dir, f"{new_filename}{file_extension}")):
-                        logger.info(f'File already existing in dest dir {pjoin(dest_dir, f"{new_filename}{file_extension}")}')
+                        logging.info(f'File already existing in dest dir {pjoin(dest_dir, f"{new_filename}{file_extension}")}')
                         ext = 'a'
                         for i in range(26):
                             if not pexists(pjoin(dest_dir, f"{new_filename}_{ext}{file_extension}")):
@@ -762,11 +775,11 @@ class BIDSHandler:
         if pexists(pjoin(bids_dir, f'sub-{new_id}')):
             msg = f"Subject {new_id} already exists in the database. "
             msg += "Delete the subject first or choose another subject id."
-            logger.error(msg)
+            logging.error(msg)
             raise FileExistsError(msg)
             
         if not pexists(pjoin(bids_dir, f'sub-{old_id}')):
-            logger.error(f"Subject {old_id} is not in the database.")
+            logging.error(f"Subject {old_id} is not in the database.")
             raise FileNotFoundError(f"Subject {old_id} is not in the database.")
 
         for dirpath, _, files in os.walk(bids_dir):
@@ -792,15 +805,15 @@ class BIDSHandler:
         if pexists(pjoin(bids_dir, f'sub-{subject}',f'ses-{new_ses}')):
             msg = f"Session {new_ses} already exists for sub-{subject} in the database. "
             msg += "Delete the session for this subject first or choose another session."
-            logger.error(msg)
+            logging.error(msg)
             raise FileExistsError(msg)
     
         if not pexists(pjoin(bids_dir, f'sub-{subject}')):
-            logger.error(f"Subject {old_id} is not in the database.")
+            logging.error(f"Subject {old_id} is not in the database.")
             raise FileNotFoundError(f"Subject {old_id} is not in the database.")
             
         if not pexists(pjoin(bids_dir, f'sub-{subject}', f'ses-{old_ses}')):
-            logger.error(f"Session {old_ses} for Subject {subject} is not in the database.")
+            logging.error(f"Session {old_ses} for Subject {subject} is not in the database.")
             raise FileNotFoundError(f"Session {old_ses} for Subject {subject} is not in the database.")
 
         # for dirpath, _, _ in os.walk(bids_dir):
@@ -850,10 +863,10 @@ class BIDSHandler:
             len(os.listdir(pjoin(sourcedata, f"sub-{pat_id}",
                                        f"ses-{session}"))) > 0:
 
-            logger.error("[ERROR] Error while trying to copy the dicom folder into")
-            logger.info(f"sourcedata folder: sourcedata/sub-{pat_id}/ses-{session}")
-            logger.info("already exists and is not empty.")
-            logger.info(" Please remove this directory and try again.")
+            logging.error("[ERROR] Error while trying to copy the dicom folder into")
+            logging.info(f"sourcedata folder: sourcedata/sub-{pat_id}/ses-{session}")
+            logging.info("already exists and is not empty.")
+            logging.info(" Please remove this directory and try again.")
             return
 
 
@@ -862,7 +875,7 @@ class BIDSHandler:
         self.mkdir_if_not_exists(pjoin(sourcedata, f"sub-{pat_id}",
                                        f"ses-{session}"))
 
-        logger.info("[INFO] Copying dicom folder to sourcedata ...")
+        logging.info("[INFO] Copying dicom folder to sourcedata ...")
         shutil.copytree(dicomfolder, pjoin(sourcedata, f"sub-{pat_id}",
                                        f"ses-{session}", "DICOM"))
 
@@ -879,9 +892,9 @@ class BIDSHandler:
         # Create directories in the BIDS file structure by giving an incremental id
         # pat_id, session = make_directories(bids_dir,pat_id=None,session=None)
         # To specify the patient id:
-        logger.debug('make directories ?')
+        logging.debug('make directories ?')
         pat_id, session = self.make_directories(pat_id=pat_id,session=session, logger=logger)
-        logger.debug('make directories !')
+        logging.debug('make directories !')
         # To specify the patient id and session:
         # pat_id, session = make_directories(bids_dir,pat_id='ID_TO_SPECIFY',session='SESSION_TO_SPECIFY')
 
@@ -894,7 +907,7 @@ class BIDSHandler:
 
         self.anonymisation(pat_id, session, logger=logger)
         
-        logger.info(f"[INFO] done for patient {pat_id}")
+        logging.info(f"[INFO] done for patient {pat_id}")
 
         if return_dicom_series:
             return pat_id, session, dicom_series
@@ -905,7 +918,7 @@ class BIDSHandler:
         
         src = pjoin(self.root_dir, f'sourcedata', f'sub-{sub}', f'ses-{ses}')
         
-        logger.info('[INFO] Sorting dicoms ...')
+        logging.info('[INFO] Sorting dicoms ...')
         def clean_text(string):
             # clean and standardize text descriptions, which makes searching files easier
             forbidden_symbols = ["*", ".", ",", "\"", "\\", "/", "|", "[", "]", ":", ";", " "]
@@ -915,7 +928,7 @@ class BIDSHandler:
 
         dst = f"{self.root_dir}/sourcedata/sub-{sub}/ses-{ses}/DICOM/sorted"
 
-        logger.info('reading file list...')
+        logging.info('reading file list...')
         unsortedList = []
         corresponding_root = []
         for root, dirs, files in os.walk(src):
@@ -924,7 +937,7 @@ class BIDSHandler:
                     unsortedList.append(os.path.join(root, file))
                     corresponding_root.append(root)
 
-        logger.info('%s files found.' % len(unsortedList))
+        logging.info('%s files found.' % len(unsortedList))
 
         pat_name = None
         pat_date = None
@@ -977,7 +990,7 @@ class BIDSHandler:
 
             ds.save_as(os.path.join(dst, scanning_sequence, fileName))
 
-        logger.info('done.')
+        logging.info('done.')
 
         return pat_name, pat_date
 
@@ -1044,20 +1057,20 @@ class BIDSHandler:
         anonym_df = pd.DataFrame(anonym)
         anonym_df.to_csv(pjoin(self.root_dir, "participants.tsv"), index=False, sep='\t')
 
-        logger.info('[INFO] Anonymisation done')
+        logging.info('[INFO] Anonymisation done')
         
     def modify_participants_tsv(self, old_sub='', new_sub='', old_ses='', new_ses='', logger=logging):
         try:
             participants = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
         except FileNotFoundError: 
-            logger.error('participants.tsv does not exists')
+            logging.error('participants.tsv does not exists')
             return
         if old_sub == '':
             return 
         try:
             key_num = list(participants['participant_id'].values()).index(f'sub-{old_sub}')
         except ValueError:
-            logger.error('sub-{old_sub} is not present in the database (participants.tsv')
+            logging.error('sub-{old_sub} is not present in the database (participants.tsv')
             return
         
         if new_sub == '':
@@ -1070,7 +1083,7 @@ class BIDSHandler:
                 return
             else:
                 if f'ses-{old_ses}' not in participants.keys():
-                    logger.error(f'Subject {old_sub} does not have a session {old_ses}')
+                    logging.error(f'Subject {old_sub} does not have a session {old_ses}')
                     pass
                 else:
                     if new_ses == '':
