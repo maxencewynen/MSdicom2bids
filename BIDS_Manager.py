@@ -165,6 +165,7 @@ class MainWindow(QMainWindow):
         self.std_out_text_receiver.moveToThread(self.thread_std_out_queue_listener)
         # attach to start / stop methods
         self.thread_std_out_queue_listener.started.connect(self.std_out_text_receiver.run)
+        self.thread_std_out_queue_listener.finished.connect(self.thread_std_out_queue_listener.deleteLater)
         self.thread_std_out_queue_listener.start()
 # =============================================================================
 # 
@@ -195,11 +196,13 @@ class MainWindow(QMainWindow):
         # time.sleep(3)
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
+        self.thread_std_out_queue_listener.quit()
     
     def close(self):
         # time.sleep(3)
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
+        self.thread_std_out_queue_listener.quit()
 
     def update_bids(self):
         logging.info("update_bids!")
@@ -1498,14 +1501,14 @@ class AddWorker(QObject):
                 pass
         self.finished.emit()
         
-class StdOutTextEdit(QTextEdit):
+class StdOutTextEdit(QPlainTextEdit):
     def __init__(self, parent):
         super(StdOutTextEdit, self).__init__()
         self.setParent(parent)
         self.setReadOnly(True)
-        self.setLineWidth(50)
+        # self.setLineWidth(50)
         self.setMinimumSize(700,300)
-        self.setFont(QFont('Consolas', 11))
+        # self.setFont(QFont('Consolas', 11))
 
     @pyqtSlot(str)
     def append_text(self, text: str):

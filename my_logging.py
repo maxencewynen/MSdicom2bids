@@ -24,13 +24,20 @@ def setup_logging(log_prefix, force_debug_level=logging.DEBUG):
         __log_file_name = "{}-{}_log_file.txt".format(log_prefix,
                                                       datetime.datetime.utcnow().isoformat().replace(":", "-"))
 
-        __log_format = '%(asctime)s - %(name)-30s - %(levelname)s - %(message)s'
-        __console_date_format = '%Y-%m-%d %H:%M:%S'
-        __file_date_format = '%Y-%m-%d %H-%M-%S'
+        # __log_format = '%(asctime)s - %(name)-30s - %(levelname)s - %(message)s'
+        # __console_date_format = '%Y-%m-%d %H:%M:%S'
+        # __file_date_format = '%Y-%m-%d %H-%M-%S'
 
-        console_formatter = logging.Formatter(__log_format, __console_date_format)
+        # console_formatter = logging.Formatter(__log_format, __console_date_format)
 
-        file_formatter = logging.Formatter(__log_format, __file_date_format)
+        # file_formatter = logging.Formatter(__log_format, __file_date_format)
+        __log_format = '%(levelname)s - %(message)s'
+        # __console_date_format = '%Y-%m-%d %H:%M:%S'
+        # __file_date_format = '%Y-%m-%d %H-%M-%S'
+
+        console_formatter = logging.Formatter(__log_format)
+
+        file_formatter = logging.Formatter(__log_format)
         file_handler = logging.FileHandler(__log_file_name, mode='a', delay=True)
 
         file_handler.setLevel(logging.DEBUG)
