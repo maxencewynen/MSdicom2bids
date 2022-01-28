@@ -106,6 +106,19 @@ def configure_tqdm_redirection(tqdm_nb_columns=None):
         tqdm_nb_columns=tqdm_nb_columns)
 
 
+# def delete_config_dict(config_dict):
+#     print('test')
+#     del config_dict['TQDM_WRITE_STREAM_CONFIG']['queue']
+#     del config_dict['TQDM_WRITE_STREAM_CONFIG']['write_stream']
+#     del config_dict['TQDM_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+#     del config_dict['TQDM_WRITE_STREAM_CONFIG']
+#     del config_dict['STDOUT_WRITE_STREAM_CONFIG']['queue']
+#     del config_dict['STDOUT_WRITE_STREAM_CONFIG']['write_stream']
+#     del config_dict['STDOUT_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+#     del config_dict['STDOUT_WRITE_STREAM_CONFIG']
+#     del config_dict
+    
+
 class StdOutTextQueueReceiver(QObject):
     # we are forced to define 1 signal per class
     # see https://stackoverflow.com/questions/50294652/how-to-create-pyqtsignals-dynamically
@@ -114,13 +127,19 @@ class StdOutTextQueueReceiver(QObject):
     def __init__(self, q: Queue, *args, **kwargs):
         QObject.__init__(self, *args, **kwargs)
         self.queue = q
+        self._isRunning = True
 
     @pyqtSlot()
     def run(self):
         self.queue_std_out_element_received_signal.emit('---> STD OUT Queue reception Started <---\n')
-        while True:
+        while self._isRunning:
             text = self.queue.get()
             self.queue_std_out_element_received_signal.emit(text)
+            
+    def stop(self):
+        print('stop listener')
+        self._isRunning = False
+        del self.queue
 
 
 class TQDMTextQueueReceiver(QObject):
@@ -131,14 +150,20 @@ class TQDMTextQueueReceiver(QObject):
     def __init__(self, q: Queue, *args, **kwargs):
         QObject.__init__(self, *args, **kwargs)
         self.queue = q
+        self._isRunning = True
 
     @pyqtSlot()
     def run(self):
         # we assume that all TQDM outputs start with \r, so use that to show stream reception is started
         self.queue_tqdm_element_received_signal.emit('\r---> TQDM Queue reception Started <---\n')
-        while True:
+        while self._isRunning:
             text = self.queue.get()
             self.queue_tqdm_element_received_signal.emit(text)
-
-
+    
+    def stop(self):
+        print('stop listener')
+        self._isRunning = False
+        del self.queue
+        
+        
 setup_streams_redirection()

@@ -196,13 +196,20 @@ class MainWindow(QMainWindow):
         # time.sleep(3)
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
+        # output_redirection_tools.delete_config_dict(config_dict)
+        self.std_out_text_receiver.deleteLater()
+        self.std_out_text_receiver.stop()
         self.thread_std_out_queue_listener.quit()
+        self.thread_std_out_queue_listener.wait()
     
     def close(self):
         # time.sleep(3)
         memory_df = pd.DataFrame(self.memory, index=[0])
-        memory_df.to_pickle('memory.xz')
+        # output_redirection_tools.delete_config_dict(config_dict)
+        self.std_out_text_receiver.deleteLater()
+        self.std_out_text_receiver.stop()
         self.thread_std_out_queue_listener.quit()
+        self.thread_std_out_queue_listener.wait()
 
     def update_bids(self):
         logging.info("update_bids!")
@@ -1553,3 +1560,13 @@ if __name__ == "__main__":
     window.show()
 
     app.exec()
+    
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']['queue']
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']['write_stream']
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['queue']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['write_stream']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']
+    del config_dict
