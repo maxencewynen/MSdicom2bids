@@ -1,1 +1,0 @@
-WARNING - /!\ Directory is not considered as a valid BIDS directory !!!

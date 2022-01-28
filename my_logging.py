@@ -21,8 +21,8 @@ def setup_logging(log_prefix, force_debug_level=logging.DEBUG):
     if config_dict[IS_SETUP_DONE]:
         pass
     else:
-        __log_file_name = "{}-{}_log_file.txt".format(log_prefix,
-                                                      datetime.datetime.utcnow().isoformat().replace(":", "-"))
+        # __log_file_name = "{}-{}_log_file.txt".format(log_prefix,
+        #                                               datetime.datetime.utcnow().isoformat().replace(":", "-"))
 
         # __log_format = '%(asctime)s - %(name)-30s - %(levelname)s - %(message)s'
         # __console_date_format = '%Y-%m-%d %H:%M:%S'
@@ -37,12 +37,12 @@ def setup_logging(log_prefix, force_debug_level=logging.DEBUG):
 
         console_formatter = logging.Formatter(__log_format)
 
-        file_formatter = logging.Formatter(__log_format)
-        file_handler = logging.FileHandler(__log_file_name, mode='a', delay=True)
+        # file_formatter = logging.Formatter(__log_format)
+        # file_handler = logging.FileHandler(__log_file_name, mode='a', delay=True)
 
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(file_formatter)
-        root.addHandler(file_handler)
+        # file_handler.setLevel(logging.DEBUG)
+        # file_handler.setFormatter(file_formatter)
+        # root.addHandler(file_handler)
 
         tqdm_handler = TqdmLoggingHandler()
         tqdm_handler.setLevel(logging.DEBUG)
