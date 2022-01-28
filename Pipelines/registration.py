@@ -2,7 +2,7 @@ import sys
 import os
 from os.path import join as pjoin
 from os.path import exists as pexists
-from dicom2bids import *
+# from dicom2bids import *
 import logging
 from PyQt5.QtCore import (QSize,
                           Qt,
@@ -46,6 +46,11 @@ import platform
 import json
 from bids_validator import BIDSValidator
 
+
+# from my_logging import setup_logging
+from tqdm.auto import tqdm
+
+
 def launch(parent):
     window = MainWindow(parent)
     window.show()
@@ -61,6 +66,8 @@ class MainWindow(QMainWindow):
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.center()
+        
+        logging.info('Test from registration')
 
         self.tabs = QTabWidget(self)
         # Tab1
@@ -286,61 +293,71 @@ class RegistrationTab(QWidget):
 
         for sub, sess in self.subjects_and_sessions:
             for ses in sess:
-                # Create directory
-                directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.name_reg}'), pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}'),pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}',f'ses-{self.ses_to_register}')]
-                self.bids.mkdirs_if_not_exist(self.bids.root_dir, directories=directories)
-                registered_path = pjoin(self.bids.root_dir,'derivatives','registrations',f'{self.name_reg}')
-                # Perform registration
-                if same_ses:
-                    image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
-                    ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.ref_sequence}.nii.gz')
-                    registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
-                    logging.debug(image_to_register)
-                    logging.debug(ref_image)
-                    logging.debug(registered_image)
-                    logging.debug(pexists(image_to_register) and pexists(ref_image))
-                    if pexists(image_to_register) and pexists(ref_image):
-                        logging.info(f'Registering {image_to_register} onto {ref_image} ...')
+                # # Create directory
+                # directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.name_reg}'), pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}'),pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}',f'ses-{self.ses_to_register}')]
+                # self.bids.mkdirs_if_not_exist(self.bids.root_dir, directories=directories)
+                # registered_path = pjoin(self.bids.root_dir,'derivatives','registrations',f'{self.name_reg}')
+                # # Perform registration
+                # if same_ses:
+                #     image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
+                #     ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.ref_sequence}.nii.gz')
+                #     registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
+                #     logging.debug(image_to_register)
+                #     logging.debug(ref_image)
+                #     logging.debug(registered_image)
+                #     logging.debug(pexists(image_to_register) and pexists(ref_image))
+                #     if pexists(image_to_register) and pexists(ref_image):
+                #         logging.info(f'Registering {image_to_register} onto {ref_image} ...')
 
-                        subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
-                        subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
-                        subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
+                #         subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
+                #         subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
+                #         subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
 
-                        logging.info(f'Registering {image_to_register} onto {ref_image} done')
+                #         logging.info(f'Registering {image_to_register} onto {ref_image} done')
 
-                        if self.apply_same_transformation_check.isChecked() == True:
-                            logging.info(f'Applaying same transformation ...')
-                            for trans_seq, trans_path in (self.trans_sequences,self.trans_path_to_register):
-                                trans_image_to_register = pjoin(self.rename_path_sub_ses(trans_path,sub,ses),f'sub-{sub}_ses-{ses}_{trans_seq}.nii.gz')
-                                trans_registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{trans_seq}_{self.reg_name}')
+                #         if self.apply_same_transformation_check.isChecked() == True:
+                #             logging.info(f'Applaying same transformation ...')
+                #             for trans_seq, trans_path in (self.trans_sequences,self.trans_path_to_register):
+                #                 trans_image_to_register = pjoin(self.rename_path_sub_ses(trans_path,sub,ses),f'sub-{sub}_ses-{ses}_{trans_seq}.nii.gz')
+                #                 trans_registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{trans_seq}_{self.reg_name}')
 
-                                if pexists(trans_image_to_register):
-                                    subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
-                else:
-                    image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
-                    ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,self.ref_ses),f'sub-{sub}_ses-{self.ref_ses}_{self.ref_sequence}.nii.gz')
-                    registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
+                #                 if pexists(trans_image_to_register):
+                #                     subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
+                # else:
+                #     image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
+                #     ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,self.ref_ses),f'sub-{sub}_ses-{self.ref_ses}_{self.ref_sequence}.nii.gz')
+                #     registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
 
-                    if pexists(image_to_register) and pexists(ref_image):
-                        logging.info(f'Registering {image_to_register} onto {ref_image} ...')
+                #     if pexists(image_to_register) and pexists(ref_image):
+                #         logging.info(f'Registering {image_to_register} onto {ref_image} ...')
 
-                        subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
-                        subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
-                        subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
+                #         subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
+                #         subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
+                #         subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
 
-                        logging.info(f'Registering {image_to_register} onto {ref_image} done')
+                #         logging.info(f'Registering {image_to_register} onto {ref_image} done')
 
-                        if self.apply_same_transformation_check.isChecked() == True:
-                            logging.info(f'Applaying same transformation ...')
-                            for trans_seq, trans_path in (self.trans_sequences,self.trans_path_to_register):
-                                trans_image_to_register = pjoin(self.rename_path_sub_ses(trans_path,sub,ses),f'sub-{sub}_ses-{ses}_{trans_seq}.nii.gz')
-                                trans_registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{trans_seq}_{self.reg_name}')
+                #         if self.apply_same_transformation_check.isChecked() == True:
+                #             logging.info(f'Applaying same transformation ...')
+                #             for trans_seq, trans_path in (self.trans_sequences,self.trans_path_to_register):
+                #                 trans_image_to_register = pjoin(self.rename_path_sub_ses(trans_path,sub,ses),f'sub-{sub}_ses-{ses}_{trans_seq}.nii.gz')
+                #                 trans_registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{trans_seq}_{self.reg_name}')
 
-                                if pexists(trans_image_to_register):
-                                    subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
+                #                 if pexists(trans_image_to_register):
+                #                     subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
 
-                # registration = RunnableRegistration(self, sub, ses, same_ses)
-                # self.parent.threads_pool.start(registration)
+                # # registration = RunnableRegistration(self, sub, ses, same_ses)
+                # # self.parent.threads_pool.start(registration)
+                
+                self.thread = QThread()
+                self.registration = RegistrationWorker(self, sub, ses, same_ses)
+                self.registration.moveToThread(self.thread)
+                self.thread.started.connect(self.registration.run)
+                self.registration.finished.connect(self.thread.quit)
+                self.registration.finished.connect(self.registration.deleteLater)
+                self.thread.finished.connect(self.thread.deleteLater)
+                # self.operation.logHandler.log.signal.connect(self.write_log)
+                self.thread.start()
 
     @staticmethod
     def rename_path_sub_ses(path,sub,ses):
@@ -575,41 +592,51 @@ class TransformationTab(QWidget):
 
         for sub, sess in self.subjects_and_sessions:
             for ses in sess:
-                # Create directory
-                directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.name_reg}'), pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}'),pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}',f'ses-{self.ses_to_register}')]
-                self.bids.mkdirs_if_not_exist(self.bids.root_dir, directories=directories)
-                registered_path = pjoin(self.bids.root_dir,'derivatives','registrations',f'{self.name_reg}')
-                # Perform registration
-                if same_ses:
-                    image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
-                    ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.ref_sequence}.nii.gz')
-                    registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
-                    transformation_matrix = pjoin(self.rename_path_sub_ses(self.trans_matrix_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.trans_matrix_sequence}.mat')
-                    logging.debug(image_to_register)
-                    logging.debug(ref_image)
-                    logging.debug(registered_image)
-                    logging.debug(pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix))
-                    logging.debug(transformation_matrix)
-                    if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
-                        logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
+                # # Create directory
+                # directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.name_reg}'), pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}'),pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}',f'ses-{self.ses_to_register}')]
+                # self.bids.mkdirs_if_not_exist(self.bids.root_dir, directories=directories)
+                # registered_path = pjoin(self.bids.root_dir,'derivatives','registrations',f'{self.name_reg}')
+                # # Perform registration
+                # if same_ses:
+                #     image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
+                #     ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.ref_sequence}.nii.gz')
+                #     registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
+                #     transformation_matrix = pjoin(self.rename_path_sub_ses(self.trans_matrix_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.trans_matrix_sequence}.mat')
+                #     logging.debug(image_to_register)
+                #     logging.debug(ref_image)
+                #     logging.debug(registered_image)
+                #     logging.debug(pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix))
+                #     logging.debug(transformation_matrix)
+                #     if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
+                #         logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
 
-                        subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
+                #         subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
 
-                        logging.info(f'Tranforming {image_to_register} onto {ref_image} done')
+                #         logging.info(f'Tranforming {image_to_register} onto {ref_image} done')
 
-                else:
-                    image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
-                    ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,self.ref_ses),f'sub-{sub}_ses-{self.ref_ses}_{self.ref_sequence}.nii.gz')
-                    registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
-                    transformation_matrix = pjoin(self.rename_path_sub_ses(self.trans_matrix_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.trans_matrix_sequence}.mat')
-                    if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
-                        logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
+                # else:
+                #     image_to_register = pjoin(self.rename_path_sub_ses(self.path_to_register,sub,ses),f'sub-{sub}_ses-{ses}_{self.sequence_to_register}.nii.gz')
+                #     ref_image = pjoin(self.rename_path_sub_ses(self.ref_path,sub,self.ref_ses),f'sub-{sub}_ses-{self.ref_ses}_{self.ref_sequence}.nii.gz')
+                #     registered_image = pjoin(registered_path,f'sub-{sub}',f'ses-{ses}',f'sub-{sub}_ses-{ses}_{self.sequence_to_register}_{self.name_reg}')
+                #     transformation_matrix = pjoin(self.rename_path_sub_ses(self.trans_matrix_path,sub,ses),f'sub-{sub}_ses-{ses}_{self.trans_matrix_sequence}.mat')
+                #     if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
+                #         logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
 
-                        subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
+                #         subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
 
-                        logging.info(f'Transforming {image_to_register} onto {ref_image} done')
-                # transformation = RunnableTransformation(self, sub, ses, same_ses)
-                # self.parent.threads_pool.start(transformation)
+                #         logging.info(f'Transforming {image_to_register} onto {ref_image} done')
+                # # transformation = RunnableTransformation(self, sub, ses, same_ses)
+                # # self.parent.threads_pool.start(transformation)
+                
+                self.thread = QThread()
+                self.transformation = TransformationWorker(self, sub, ses, same_ses)
+                self.transformation.moveToThread(self.thread)
+                self.thread.started.connect(self.transformation.run)
+                self.transformation.finished.connect(self.thread.quit)
+                self.transformation.finished.connect(self.transformation.deleteLater)
+                self.thread.finished.connect(self.thread.deleteLater)
+                # self.operation.logHandler.log.signal.connect(self.write_log)
+                self.thread.start()
 
     @staticmethod
     def rename_path_sub_ses(path,sub,ses):
@@ -628,68 +655,68 @@ class TransformationTab(QWidget):
 
 
 
-class RunnableRegistration(QRunnable):
+# class RunnableRegistration(QRunnable):
 
-    def __init__(self, reg, sub, ses, same_ses):
-        super().__init__()
-        self.reg = reg
-        self.sub = sub
-        self.ses = ses
-        self.same_ses = same_ses
+#     def __init__(self, reg, sub, ses, same_ses):
+#         super().__init__()
+#         self.reg = reg
+#         self.sub = sub
+#         self.ses = ses
+#         self.same_ses = same_ses
 
-    def run(self):
-        # Create directory
-        directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.reg.name_reg}'), pjoin('derivatives','registrations',f'{self.reg.name_reg}',f'sub-{self.reg.sub_to_register}'),pjoin('derivatives','registrations',f'{self.reg.name_reg}',f'sub-{self.reg.sub_to_register}',f'ses-{self.reg.ses_to_register}')]
-        self.reg.bids.mkdirs_if_not_exist(self.reg.bids.root_dir, directories=directories)
-        registered_path = pjoin(self.reg.bids.root_dir,'derivatives','registrations',f'{self.reg.name_reg}')
-        # Perform registration
-        if self.same_ses:
-            image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
-            ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.ref_sequence}.nii.gz')
-            registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
-            # logging.debug(image_to_register)
-            # logging.debug(ref_image)
-            # logging.debug(registered_image)
-            # logging.debug(pexists(image_to_register) and pexists(ref_image))
-            if pexists(image_to_register) and pexists(ref_image):
-                logging.info(f'Registering {image_to_register} onto {ref_image} ...')
+#     def run(self):
+#         # Create directory
+#         directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.reg.name_reg}'), pjoin('derivatives','registrations',f'{self.reg.name_reg}',f'sub-{self.reg.sub_to_register}'),pjoin('derivatives','registrations',f'{self.reg.name_reg}',f'sub-{self.reg.sub_to_register}',f'ses-{self.reg.ses_to_register}')]
+#         self.reg.bids.mkdirs_if_not_exist(self.reg.bids.root_dir, directories=directories)
+#         registered_path = pjoin(self.reg.bids.root_dir,'derivatives','registrations',f'{self.reg.name_reg}')
+#         # Perform registration
+#         if self.same_ses:
+#             image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
+#             ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.ref_sequence}.nii.gz')
+#             registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
+#             # logging.debug(image_to_register)
+#             # logging.debug(ref_image)
+#             # logging.debug(registered_image)
+#             # logging.debug(pexists(image_to_register) and pexists(ref_image))
+#             if pexists(image_to_register) and pexists(ref_image):
+#                 logging.info(f'Registering {image_to_register} onto {ref_image} ...')
 
-                subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
-                subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
-                subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
+#                 subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
+#                 subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
+#                 subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
 
-                logging.info(f'Registering {image_to_register} onto {ref_image} done')
+#                 logging.info(f'Registering {image_to_register} onto {ref_image} done')
 
-                if self.reg.apply_same_transformation_check.isChecked() == True:
-                    logging.info(f'Applaying same transformation ...')
-                    for trans_seq, trans_path in (self.reg.trans_sequences,self.reg.trans_path_to_register):
-                        trans_image_to_register = pjoin(self.reg.rename_path_sub_ses(trans_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{trans_seq}.nii.gz')
-                        trans_registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{trans_seq}_{self.reg.reg_name}')
+#                 if self.reg.apply_same_transformation_check.isChecked() == True:
+#                     logging.info(f'Applaying same transformation ...')
+#                     for trans_seq, trans_path in (self.reg.trans_sequences,self.reg.trans_path_to_register):
+#                         trans_image_to_register = pjoin(self.reg.rename_path_sub_ses(trans_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{trans_seq}.nii.gz')
+#                         trans_registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{trans_seq}_{self.reg.reg_name}')
 
-                        if pexists(trans_image_to_register):
-                            subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
-        else:
-            image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
-            ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.reg.ref_ses),f'sub-{self.sub}_ses-{self.reg.ref_ses}_{self.reg.ref_sequence}.nii.gz')
-            registered_image = pjoin(registered_path,f'sub-{self.sub}',f'self.ses-{ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
+#                         if pexists(trans_image_to_register):
+#                             subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
+#         else:
+#             image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
+#             ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.reg.ref_ses),f'sub-{self.sub}_ses-{self.reg.ref_ses}_{self.reg.ref_sequence}.nii.gz')
+#             registered_image = pjoin(registered_path,f'sub-{self.sub}',f'self.ses-{ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
 
-            if pexists(image_to_register) and pexists(ref_image):
-                logging.info(f'Registering {image_to_register} onto {ref_image} ...')
+#             if pexists(image_to_register) and pexists(ref_image):
+#                 logging.info(f'Registering {image_to_register} onto {ref_image} ...')
 
-                subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
-                subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
-                subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
+#                 subprocess.Popen(f'$ANTs_registration -d 3 -n 4 -f {ref_image} -m {image_to_register} -t r -o {registered_image}',shell=True).wait()
+#                 subprocess.Popen(f'rm {registered_image}InverseWarped.nii.gz',shell=True).wait()
+#                 subprocess.Popen(f'mv {registered_image}Warped.nii.gz {registered_image}.nii.gz',shell=True).wait()
 
-                logging.info(f'Registering {image_to_register} onto {ref_image} done')
+#                 logging.info(f'Registering {image_to_register} onto {ref_image} done')
 
-                if self.reg.apply_same_transformation_check.isChecked() == True:
-                    logging.info(f'Applaying same transformation ...')
-                    for trans_seq, trans_path in (self.reg.trans_sequences,self.reg.trans_path_to_register):
-                        trans_image_to_register = pjoin(self.reg.rename_path_sub_ses(trans_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{trans_seq}.nii.gz')
-                        trans_registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{trans_seq}_{self.reg.reg_name}')
+#                 if self.reg.apply_same_transformation_check.isChecked() == True:
+#                     logging.info(f'Applaying same transformation ...')
+#                     for trans_seq, trans_path in (self.reg.trans_sequences,self.reg.trans_path_to_register):
+#                         trans_image_to_register = pjoin(self.reg.rename_path_sub_ses(trans_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{trans_seq}.nii.gz')
+#                         trans_registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{trans_seq}_{self.reg.reg_name}')
 
-                        if pexists(trans_image_to_register):
-                            subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
+#                         if pexists(trans_image_to_register):
+#                             subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {trans_image_to_register} -r {ref_image} -t {registered_image}0GenericAffine.mat -n nearestNeighbor -o {trans_registered_image}.nii.gz',shell=True).wait()
 
 class RegistrationWorker(QObject):
     finished = pyqtSignal()
@@ -701,6 +728,12 @@ class RegistrationWorker(QObject):
         self.sub = sub
         self.ses = ses
         self.same_ses = same_ses
+        
+        # # New logging
+        # setup_logging('dicom2bids')
+        # self.logger = logging.getLogger('dicom2bids')
+        # self.logger.setLevel(logging.DEBUG)
+        # # 
 
     def run(self):
         # Create directory
@@ -758,49 +791,49 @@ class RegistrationWorker(QObject):
         self.finished.emit()
 
 
-class RunnableTransformation(QRunnable):
+# class RunnableTransformation(QRunnable):
 
-    def __init__(self, reg, sub, ses, same_ses):
-        super().__init__()
-        self.reg = reg
-        self.sub = sub
-        self.ses = ses
-        self.same_ses = same_ses
+#     def __init__(self, reg, sub, ses, same_ses):
+#         super().__init__()
+#         self.reg = reg
+#         self.sub = sub
+#         self.ses = ses
+#         self.same_ses = same_ses
 
-    def run(self):
-        # Create directory
-        directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.name_reg}'), pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}'),pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}',f'ses-{self.ses_to_register}')]
-        self.reg.bids.mkdirs_if_not_exist(self.reg.bids.root_dir, directories=directories)
-        registered_path = pjoin(self.reg.bids.root_dir,'derivatives','registrations',f'{self.reg.name_reg}')
-        # Perform registration
-        if self.same_ses:
-            image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
-            ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.ref_sequence}.nii.gz')
-            registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
-            transformation_matrix = pjoin(self.reg.rename_path_sub_ses(self.reg.trans_matrix_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.trans_matrix_sequence}.mat')
-            logging.debug(image_to_register)
-            logging.debug(ref_image)
-            logging.debug(registered_image)
-            logging.debug(pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix))
-            logging.debug(transformation_matrix)
-            if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
-                logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
+#     def run(self):
+#         # Create directory
+#         directories = [pjoin('derivatives','registrations'), pjoin('derivatives','registrations',f'{self.name_reg}'), pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}'),pjoin('derivatives','registrations',f'{self.name_reg}',f'sub-{self.sub_to_register}',f'ses-{self.ses_to_register}')]
+#         self.reg.bids.mkdirs_if_not_exist(self.reg.bids.root_dir, directories=directories)
+#         registered_path = pjoin(self.reg.bids.root_dir,'derivatives','registrations',f'{self.reg.name_reg}')
+#         # Perform registration
+#         if self.same_ses:
+#             image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
+#             ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.ref_sequence}.nii.gz')
+#             registered_image = pjoin(registered_path,f'sub-{self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
+#             transformation_matrix = pjoin(self.reg.rename_path_sub_ses(self.reg.trans_matrix_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.trans_matrix_sequence}.mat')
+#             logging.debug(image_to_register)
+#             logging.debug(ref_image)
+#             logging.debug(registered_image)
+#             logging.debug(pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix))
+#             logging.debug(transformation_matrix)
+#             if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
+#                 logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
 
-                subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
+#                 subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
 
-                logging.info(f'Tranforming {image_to_register} onto {ref_image} done')
+#                 logging.info(f'Tranforming {image_to_register} onto {ref_image} done')
 
-        else:
-            image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
-            ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.reg.ref_ses),f'sub-{self.sub}_ses-{self.reg.ref_ses}_{self.reg.ref_sequence}.nii.gz')
-            registered_image = pjoin(registered_path,f'sub-{self.self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
-            transformation_matrix = pjoin(self.reg.rename_path_sub_ses(self.reg.trans_matrix_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.trans_matrix_sequence}.mat')
-            if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
-                logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
+#         else:
+#             image_to_register = pjoin(self.reg.rename_path_sub_ses(self.reg.path_to_register,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}.nii.gz')
+#             ref_image = pjoin(self.reg.rename_path_sub_ses(self.reg.ref_path,self.sub,self.reg.ref_ses),f'sub-{self.sub}_ses-{self.reg.ref_ses}_{self.reg.ref_sequence}.nii.gz')
+#             registered_image = pjoin(registered_path,f'sub-{self.self.sub}',f'ses-{self.ses}',f'sub-{self.sub}_ses-{self.ses}_{self.reg.sequence_to_register}_{self.reg.name_reg}')
+#             transformation_matrix = pjoin(self.reg.rename_path_sub_ses(self.reg.trans_matrix_path,self.sub,self.ses),f'sub-{self.sub}_ses-{self.ses}_{self.reg.trans_matrix_sequence}.mat')
+#             if pexists(image_to_register) and pexists(ref_image) and pexists(transformation_matrix):
+#                 logging.info(f'Transforming {image_to_register} onto {ref_image} using {transformation_matrix} matrix ...')
 
-                subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
+#                 subprocess.Popen('${ANTSPATH}/antsApplyTransforms -d 3 -i {image_to_register} -r {ref_image} -t {transformation_matrix} -n nearestNeighbor -o {registered_image}.nii.gz',shell=True).wait()
 
-                logging.info(f'Transforming {image_to_register} onto {ref_image} done')
+#                 logging.info(f'Transforming {image_to_register} onto {ref_image} done')
 
 class TransformationWorker(QObject):
     finished = pyqtSignal()
@@ -812,6 +845,12 @@ class TransformationWorker(QObject):
         self.sub = sub
         self.ses = ses
         self.same_ses = same_ses
+        
+        # # New logging
+        # setup_logging('dicom2bids')
+        # self.logger = logging.getLogger('dicom2bids')
+        # self.logger.setLevel(logging.DEBUG)
+        # # 
 
     def run(self):
         # Create directory

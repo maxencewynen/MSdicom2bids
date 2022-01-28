@@ -7,6 +7,8 @@ Created on Wed Nov 10 14:25:40 2021
 BIDS MANAGER GUI
 """
 
+import output_redirection_tools # KEEP ME !!!
+
 import time
 import sys
 import os
@@ -23,7 +25,8 @@ from PyQt5.QtCore import (QSize,
                           pyqtSignal, 
                           pyqtSlot,
                           QRunnable, 
-                          QThreadPool)
+                          QThreadPool, 
+                          QProcess)
 from PyQt5.QtWidgets import (QDesktopWidget, 
                              QApplication, 
                              QWidget, 
@@ -39,6 +42,7 @@ from PyQt5.QtWidgets import (QDesktopWidget,
                              QFileSystemModel, 
                              QGridLayout, 
                              QPlainTextEdit,
+                             QTextEdit,
                              QMessageBox, 
                              QListWidget, 
                              QTableWidget, 
@@ -46,7 +50,8 @@ from PyQt5.QtWidgets import (QDesktopWidget,
                              QMenu, 
                              QAction)
 from PyQt5.QtGui import (QFont, 
-                         QIcon)
+                         QIcon, 
+                         QTextCursor)
 import traceback
 import threading
 import subprocess
@@ -54,6 +59,13 @@ import pandas as pd
 import platform
 import json
 from bids_validator import BIDSValidator
+import faulthandler
+
+from config import config_dict, STDOUT_WRITE_STREAM_CONFIG, TQDM_WRITE_STREAM_CONFIG, STREAM_CONFIG_KEY_QUEUE, \
+    STREAM_CONFIG_KEY_QT_QUEUE_RECEIVER
+from my_logging import setup_logging
+
+faulthandler.enable()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -96,8 +108,8 @@ class MainWindow(QMainWindow):
         self.threads_pool = QThreadPool.globalInstance()
         
         
-        self.sys_stdout = sys.stdout
-        self.sys_stderr = sys.stderr
+        # self.sys_stdout = sys.stdout
+        # self.sys_stderr = sys.stderr
         # sys.stdout = logging.info
         # sys.stderr = logging.error
 
@@ -108,6 +120,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon('bids_icon.png'))
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
+        self.window.closeEvent = self.closeEvent
         
         self.center()
 
@@ -129,7 +142,34 @@ class MainWindow(QMainWindow):
 
         self.bids_actions = BidsActions(self)
 
-        self.bids_dialog = BidsDialog(self)
+        # self.bids_dialog = BidsDialog(self)
+# =============================================================================
+#         New logging
+# =============================================================================
+        setup_logging(self.__class__.__name__)
+
+        self.__logger = logging.getLogger(self.__class__.__name__)
+        self.__logger.setLevel(logging.DEBUG)
+
+        self.queue_std_out = config_dict[STDOUT_WRITE_STREAM_CONFIG][STREAM_CONFIG_KEY_QUEUE]
+ 
+        self.text_edit_std_out = StdOutTextEdit(self)
+        
+        # std out stream management
+        # create console text read thread + receiver object
+        self.thread_std_out_queue_listener = QThread()
+        self.std_out_text_receiver = config_dict[STDOUT_WRITE_STREAM_CONFIG][STREAM_CONFIG_KEY_QT_QUEUE_RECEIVER]
+        # connect receiver object to widget for text update
+        self.std_out_text_receiver.queue_std_out_element_received_signal.connect(self.text_edit_std_out.append_text)
+        # attach console text receiver to console text thread
+        self.std_out_text_receiver.moveToThread(self.thread_std_out_queue_listener)
+        # attach to start / stop methods
+        self.thread_std_out_queue_listener.started.connect(self.std_out_text_receiver.run)
+        self.thread_std_out_queue_listener.finished.connect(self.thread_std_out_queue_listener.deleteLater)
+        self.thread_std_out_queue_listener.start()
+# =============================================================================
+# 
+# =============================================================================
 
         validator = BIDSValidator()
         if not validator.is_bids(self.bids_dir):
@@ -140,7 +180,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
         layout.addWidget(self.bids_metadata, 1, 1)
         layout.addWidget(self.bids_actions, 1, 2)
-        layout.addWidget(self.bids_dialog, 2, 1, 1, 2)
+        layout.addWidget(self.text_edit_std_out, 2, 1, 1, 2)
 
         self.window.setLayout(layout)
 
@@ -153,8 +193,23 @@ class MainWindow(QMainWindow):
         self.move(qr.topLeft())
 
     def closeEvent(self, event):
+        # time.sleep(3)
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
+        # output_redirection_tools.delete_config_dict(config_dict)
+        self.std_out_text_receiver.deleteLater()
+        self.std_out_text_receiver.stop()
+        self.thread_std_out_queue_listener.quit()
+        self.thread_std_out_queue_listener.wait()
+    
+    def close(self):
+        # time.sleep(3)
+        memory_df = pd.DataFrame(self.memory, index=[0])
+        # output_redirection_tools.delete_config_dict(config_dict)
+        self.std_out_text_receiver.deleteLater()
+        self.std_out_text_receiver.stop()
+        self.thread_std_out_queue_listener.quit()
+        self.thread_std_out_queue_listener.wait()
 
     def update_bids(self):
         logging.info("update_bids!")
@@ -184,7 +239,7 @@ class MainWindow(QMainWindow):
             layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
             layout.addWidget(self.bids_metadata, 1, 1)
             layout.addWidget(self.bids_actions, 1, 2)
-            layout.addWidget(self.bids_dialog, 2, 1, 1, 2)
+            layout.addWidget(self.text_edit_std_out, 2, 1, 1, 2)
             self.window = QWidget(self)
             self.setCentralWidget(self.window)
             self.window.setLayout(layout)
@@ -227,13 +282,13 @@ class MainWindow(QMainWindow):
 
 #         logging.info(self.folderpath)
 
-    def closeEvent(self, event):
-        sys.stdout = self.sys_stdout
-        sys.stderr = self.sys_stderr
+    # def closeEvent(self, event):
+    #     sys.stdout = self.sys_stdout
+    #     sys.stderr = self.sys_stderr
 
-    def close(self):
-        sys.stdout = self.sys_stdout
-        sys.stderr = self.sys_stderr
+    # def close(self):
+    #     sys.stdout = self.sys_stdout
+    #     sys.stderr = self.sys_stderr
         
 
 class BidsDirView(QWidget):
@@ -455,6 +510,7 @@ class BidsMetadata(QWidget):
 
     def update_metadata(self):
         self.bids = self.parent.bids
+        self.bids.update_number_of_subjects()
         self.number_of_subjects.setText(f"Number of subjects: {self.bids.number_of_subjects}")
         dataset_description = self.bids.get_dataset_description()
         bids_version = dataset_description.get('BIDSVersion')
@@ -531,8 +587,9 @@ class BidsActions(QWidget):
 
     def add(self):
         logging.info("add")
-        if not hasattr(self, 'add_win'):
-            self.add_win = AddWindow(self)
+        if hasattr(self, 'add_win'):
+            del self.add_win
+        self.add_win = AddWindow(self)
         if not self.parent.dcm2niix_path:
             # ajouter une fenetre
             path = QFileDialog.getOpenFileName(self, "Select 'dcm2niix.exe' path")[0]
@@ -543,20 +600,23 @@ class BidsActions(QWidget):
 
     def remove(self):
         logging.info("remove")
-        if not hasattr(self, 'rm_win'):
-            self.rm_win = RemoveWindow(self)
+        if hasattr(self, 'rm_win'):
+            del self.rm_win
+        self.rm_win = RemoveWindow(self)
         self.rm_win.show()
 
     def rename_sub(self):
         logging.info("rename_sub")
-        if not hasattr(self, 'renameSub_win'):
-            self.renameSub_win = RenameSubject(self)
+        if hasattr(self, 'renameSub_win'):
+            del self.renameSub_win
+        self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
 
     def rename_ses(self):
         logging.info("rename_ses")
-        if not hasattr(self, 'renameSes_win'):
-            self.renameSes_win = RenameSession(self)
+        if hasattr(self, 'renameSes_win'):
+            del self.renameSes_win
+        self.renameSes_win = RenameSession(self)
         self.renameSes_win.show()
 
     def update_bids(self, parent):
@@ -565,14 +625,16 @@ class BidsActions(QWidget):
 
     def rename_seq(self):
         logging.info("rename_seq")
-        if not hasattr(self, 'renameSeq_win'):
-            self.renameSeq_win = RenameSequence(self)
+        if hasattr(self, 'renameSeq_win'):
+            del self.renameSeq_win
+        self.renameSeq_win = RenameSequence(self)
         self.renameSeq_win.show()
 
     def update_authors(self):
         logging.info("update_authors")
-        if not hasattr(self, 'updateAuthors_win'):
-            self.updateAuthors_win = UpdateAuthors(self)
+        if hasattr(self, 'updateAuthors_win'):
+            del self.updateAuthors_win
+        self.updateAuthors_win = UpdateAuthors(self)
         self.updateAuthors_win.show()
         
     def setEnabledButtons(self, enabled):
@@ -653,7 +715,7 @@ class RemoveWindow(QMainWindow):
                     self.operation.finished.connect(self.thread.quit)
                     self.operation.finished.connect(self.operation.deleteLater)
                     self.thread.finished.connect(self.thread.deleteLater)
-                    self.operation.logHandler.log.signal.connect(self.write_log)
+                    # self.operation.logHandler.log.signal.connect(self.write_log)
                     self.thread.start()
                     self.thread.finished.connect(
                         lambda: self.parent.setEnabled(True)
@@ -673,7 +735,7 @@ class RemoveWindow(QMainWindow):
                     self.operation.finished.connect(self.thread.quit)
                     self.operation.finished.connect(self.operation.deleteLater)
                     self.thread.finished.connect(self.thread.deleteLater)
-                    self.operation.logHandler.log.signal.connect(self.write_log)
+                    # self.operation.logHandler.log.signal.connect(self.write_log)
                     self.thread.start()
                     self.thread.finished.connect(
                         lambda: self.parent.setEnabled(True)
@@ -690,7 +752,7 @@ class RemoveWindow(QMainWindow):
                     self.operation.finished.connect(self.thread.quit)
                     self.operation.finished.connect(self.operation.deleteLater)
                     self.thread.finished.connect(self.thread.deleteLater)
-                    self.operation.logHandler.log.signal.connect(self.write_log)
+                    # self.operation.logHandler.log.signal.connect(self.write_log)
                     self.thread.start()
                     self.thread.finished.connect(
                         lambda: self.parent.setEnabled(True)
@@ -704,9 +766,9 @@ class RemoveWindow(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
         
-    @pyqtSlot(str)
-    def write_log(self, log_text):
-        logging.info(log_text)
+    # @pyqtSlot(str)
+    # def write_log(self, log_text):
+    #     logging.info(log_text)
 
 class AddWindow(QMainWindow):
 
@@ -834,7 +896,7 @@ class AddWindow(QMainWindow):
         #         # logging.info(exc_type, fname, exc_tb.tb_lineno)
         #         # traceback.logging.info_exc()
         
-        # self.parent.setEnabled(False)
+        self.parent.setEnabled(False)
         self.thread = QThread()
         self.worker = AddWorker(self.bids, self.list_to_add)
         self.worker.moveToThread(self.thread)
@@ -842,17 +904,17 @@ class AddWindow(QMainWindow):
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
+        # self.worker.logHandler.log.signal.connect(self.write_log)
         # self.thread.finished.connect(lambda: self.parent.setEnabled(True))
-        self.thread.finished.connect(lambda last=True: self.end_add(last=True))
-        self.worker.logHandler.log.signal.connect(self.write_log)
+        self.thread.finished.connect(lambda: self.end_add())
         self.thread.start()
         
         self.hide()
         
-    def end_add(self, last=False):
+    def end_add(self):
         self.parent.parent.bids_metadata.update_metadata()
-        if last:
-            logging.info(f'All done.')
+        logging.info(f'All done.')
+        self.parent.setEnabled(True)
 
     def center(self):
         qr = self.frameGeometry()
@@ -860,9 +922,9 @@ class AddWindow(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     
-    @pyqtSlot(str)
-    def write_log(self, log_text):
-        logging.info(log_text)
+    # @pyqtSlot(str)
+    # def write_log(self, log_text):
+    #     logging.info(log_text)
 
 class RenameSubject(QMainWindow):
 
@@ -906,7 +968,7 @@ class RenameSubject(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.operation.logHandler.log.signal.connect(self.write_log)
+        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -921,9 +983,9 @@ class RenameSubject(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     
-    @pyqtSlot(str)
-    def write_log(self, log_text):
-        logging.info(log_text)
+    # @pyqtSlot(str)
+    # def write_log(self, log_text):
+    #     logging.info(log_text)
 
 class RenameSession(QMainWindow):
     
@@ -971,7 +1033,7 @@ class RenameSession(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.operation.logHandler.log.signal.connect(self.write_log)
+        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -986,9 +1048,9 @@ class RenameSession(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     
-    @pyqtSlot(str)
-    def write_log(self, log_text):
-        logging.info(log_text)
+    # @pyqtSlot(str)
+    # def write_log(self, log_text):
+    #     logging.info(log_text)
 
 class RenameSequence(QMainWindow):
 
@@ -1032,7 +1094,7 @@ class RenameSequence(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.operation.logHandler.log.signal.connect(self.write_log)
+        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -1047,9 +1109,9 @@ class RenameSequence(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     
-    @pyqtSlot(str)
-    def write_log(self, log_text):
-        logging.info(log_text)
+    # @pyqtSlot(str)
+    # def write_log(self, log_text):
+    #     logging.info(log_text)
 
 class UpdateAuthors(QMainWindow):
 
@@ -1095,7 +1157,7 @@ class UpdateAuthors(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.operation.logHandler.log.signal.connect(self.write_log)
+        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -1117,60 +1179,116 @@ class UpdateAuthors(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     
-    @pyqtSlot(str)
-    def write_log(self, log_text):
-        logging.info(log_text)
+    # @pyqtSlot(str)
+    # def write_log(self, log_text):
+    #     logging.info(log_text)
 
 
-class QTextEditLogger(logging.Handler):
-    def __init__(self, parent):
-        super().__init__()
-        self.widget = QPlainTextEdit(parent)
-        self.widget.setReadOnly(True)
+# class QTextEditLogger(logging.Handler):
+#     def __init__(self, parent):
+#         super().__init__()
+#         self.widget = QPlainTextEdit(parent)
+#         self.widget.setReadOnly(True)
 
-    def emit(self, record):
-        msg = self.format(record)
-        self.widget.appendPlainText(msg)
+#     def emit(self, record):
+#         msg = self.format(record)
+#         self.widget.appendPlainText(msg)
 
-class BidsDialog(QDialog, QPlainTextEdit):
+# class BidsDialog(QDialog, QPlainTextEdit):
 
-    def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-        self.bids = self.parent.bids
-        self.threads_pool = self.parent.threads_pool
+#     def __init__(self, parent):
+#         super().__init__()
+#         self.parent = parent
+#         self.bids = self.parent.bids
+#         self.threads_pool = self.parent.threads_pool
 
-        self.setMinimumSize(700,300)
+#         self.setMinimumSize(700,300)
 
-        logTextBox = QTextEditLogger(self)
-        logTextBox.setFormatter(logging.Formatter('[%(levelname)s] - %(message)s'))
-        self.parent.bids.addLoggerHandler(logTextBox)
-        # logger.addHandler(logTextBox)
-        # logger.setLevel(logging.DEBUG)
-        # self.stdout = sys.stdout
-        # stdout_logger = logging.getLogger('STDOUT')
-        # sl = StreamToLogger(stdout_logger, logging.INFO)
-        # sys.stdout = sl
+#         logTextBox = QTextEditLogger(self)
+#         logTextBox.setFormatter(logging.Formatter('[%(levelname)s] - %(message)s'))
+#         self.bids.addLoggerHandler(logTextBox)
+#         # logger.addHandler(logTextBox)
+#         # logger.setLevel(logging.DEBUG)
+#         # self.stdout = sys.stdout
+#         # stdout_logger = logging.getLogger('STDOUT')
+#         # sl = StreamToLogger(stdout_logger, logging.INFO)
+#         # sys.stdout = sl
 
-        # self._button = QPushButton('Test me')
-        # self._button.clicked.connect(self.test)
+#         # self._button = QPushButton('Test me')
+#         # self._button.clicked.connect(self.test)
 
-        layout = QVBoxLayout()
-        layout.addWidget(logTextBox.widget)
-        # layout.addWidget(self._button)
-        self.setLayout(layout)
+#         layout = QVBoxLayout()
+#         layout.addWidget(logTextBox.widget)
+#         # layout.addWidget(self._button)
+#         self.setLayout(layout)
 
-    # def test(self):
-    #     logging.info('damn, a bug')
-    #     logging.info('something to remember')
-    #     logging.info('that\'s not right')
-    #     logging.info('foobar')
+#     # def test(self):
+#     #     logging.info('damn, a bug')
+#     #     logging.info('something to remember')
+#     #     logging.info('that\'s not right')
+#     #     logging.info('foobar')
 
-    # def closeEvent(self, event):
-    #     sys.stdout = self.stdout
+#     # def closeEvent(self, event):
+#     #     sys.stdout = self.stdout
 
-    # def close(self):
-    #     sys.stdout = self.stdout
+#     # def close(self):
+#     #     sys.stdout = self.stdout
+
+# class QTextEditLogger(logging.Handler):
+#     def __init__(self, parent):
+#         super().__init__()
+#         self.widget = QPlainTextEdit(parent)
+#         self.widget.setReadOnly(True)
+
+#     def emit(self, record):
+#         msg = self.format(record)
+#         self.widget.appendPlainText(msg)
+
+
+# class BidsDialog(QDialog):
+#     def __init__(self, parent):
+#         super().__init__()
+#         self.parent = parent
+#         self.bids = self.parent.bids
+        
+#         self.setMinimumSize(700,300)
+
+#         # Setup logging here:
+#         self.logTextBox = QTextEditLogger(self)
+#         self.logTextBox.setFormatter(
+#             logging.Formatter("%(levelname)s - %(message)s")
+#         )
+#         logging.getLogger().addHandler(self.logTextBox)
+#         logging.getLogger().setLevel(logging.DEBUG)
+
+#         # self._button = QtWidgets.QPushButton()
+#         # self._button.setText("Start")
+
+#         layout = QVBoxLayout(self)
+#         layout.addWidget(self.logTextBox.widget)
+#         # layout.addWidget(self._button)
+
+#         # self._button.clicked.connect(self.test)
+
+#         self.process = QProcess()
+#         self.process.readyReadStandardOutput.connect(
+#             self.handle_readyReadStandardOutput
+#         )
+#         # self.process.started.connect(lambda: print("Started!"))
+#         # self.process.finished.connect(lambda: print("Finished!"))
+
+#     # def test(self):
+#     #     logging.debug("damn, a bug")
+#     #     logging.info("something to remember")
+#     #     logging.warning("that's not right")
+#     #     logging.error("foobar")
+
+#     #     script = os.path.join(CURRENT_DIR, "another_module.py")
+#     #     self.process.start(sys.executable, [script])
+
+#     def handle_readyReadStandardOutput(self):
+#         text = self.process.readAllStandardOutput().data().decode()
+#         self.logTextBox.widget.appendPlainText(text.strip())
 
 # class StreamToLogger(object):
 #     """
@@ -1252,17 +1370,18 @@ class SubprocessWorker(QObject):
     def __init__(self, operation):
         super().__init__()
         self.operation = operation
-        # self.signal = Signals()
-        self.logger = logging.getLogger("Worker")
+        
+        # # self.signal = Signals()
+        # self.logger = logging.getLogger("Worker")
 
-        # set up log handler
-        self.logHandler = ThreadLogger()
-        self.logHandler.setFormatter(
-            logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
-        self.logger.addHandler(self.logHandler)
+        # # set up log handler
+        # self.logHandler = ThreadLogger()
+        # self.logHandler.setFormatter(
+        #     logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
+        # self.logger.addHandler(self.logHandler)
 
-        # set the logging level
-        self.logger.setLevel(logging.DEBUG)
+        # # set the logging level
+        # self.logger.setLevel(logging.DEBUG)
         
     def run(self):
         subprocess.Popen(self.operation, shell=True).wait()
@@ -1293,19 +1412,20 @@ class OperationWorker(QObject):
         self.function = function
         self.args = args
         self.kwargs = kwargs
-        # self.signal = Signals()
-        self.logger = logging.getLogger("Worker")
-
-        # set up log handler
-        self.logHandler = ThreadLogger()
-        self.logHandler.setFormatter(
-            logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
-        self.logger.addHandler(self.logHandler)
-
-        # set the logging level
-        self.logger.setLevel(logging.DEBUG)
         
-        self.kwargs['logger'] = self.logger
+        # # self.signal = Signals()
+        # self.logger = logging.getLogger("Worker")
+
+        # # set up log handler
+        # self.logHandler = ThreadLogger()
+        # self.logHandler.setFormatter(
+        #     logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
+        # self.logger.addHandler(self.logHandler)
+
+        # # set the logging level
+        # self.logger.setLevel(logging.DEBUG)
+        
+        # self.kwargs['logger'] = self.logger
         
     def run(self):
         try:
@@ -1316,25 +1436,25 @@ class OperationWorker(QObject):
             pass
         self.finished.emit()
         
-class MyLog(QObject):
-    # create a new Signal
-    # - have to be a static element
-    # - class  has to inherit from QObject to be able to emit signals
-    signal = pyqtSignal(str)
+# class MyLog(QObject):
+#     # create a new Signal
+#     # - have to be a static element
+#     # - class  has to inherit from QObject to be able to emit signals
+#     signal = pyqtSignal(str)
 
-    # not sure if it's necessary to implement this
-    def __init__(self):
-        super().__init__()
+#     # not sure if it's necessary to implement this
+#     def __init__(self):
+#         super().__init__()
         
-class ThreadLogger(logging.Handler):
-    def __init__(self):
-        super().__init__()
-        self.log = MyLog()
+# class ThreadLogger(logging.Handler):
+#     def __init__(self):
+#         super().__init__()
+#         self.log = MyLog()
 
-    # logging.Handler.emit() is intended to be implemented by subclasses
-    def emit(self, record):
-        msg = self.format(record)
-        self.log.signal.emit(msg)
+#     # logging.Handler.emit() is intended to be implemented by subclasses
+#     def emit(self, record):
+#         msg = self.format(record)
+#         self.log.signal.emit(msg)
         
 class AddWorker(QObject):
     finished = pyqtSignal()
@@ -1345,17 +1465,17 @@ class AddWorker(QObject):
         self.bids = bids
         self.list_to_add = list_to_add
         
-        # self.signal = Signals()
-        self.logger = logging.getLogger("Worker")
+        # # self.signal = Signals()
+        # self.logger = logging.getLogger("Worker")
 
-        # set up log handler
-        self.logHandler = ThreadLogger()
-        self.logHandler.setFormatter(
-            logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
-        self.logger.addHandler(self.logHandler)
+        # # set up log handler
+        # self.logHandler = ThreadLogger()
+        # self.logHandler.setFormatter(
+        #     logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
+        # self.logger.addHandler(self.logHandler)
 
-        # set the logging level
-        self.logger.setLevel(logging.DEBUG)
+        # # set the logging level
+        # self.logger.setLevel(logging.DEBUG)
         
     def run(self):
         for item in self.list_to_add:
@@ -1373,19 +1493,58 @@ class AddWorker(QObject):
             SESSION = item[2]
 
             try:
-                pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
-                                                                                pat_id      = PATIENT_ID,
-                                                                                session     = SESSION,
-                                                                                return_dicom_series=True, logger=self.logger)
+                self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
+                                                    pat_id      = PATIENT_ID,
+                                                    session     = SESSION,
+                                                    return_dicom_series=True)
                 
-                self.logger.info(f"[INFO] done for patient {pat_id}")
+                # logging.info(f"[INFO] done for patient {pat_id}")
             except Exception as e:
-                self.logger.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
+                # logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
                 # exc_type, exc_obj, exc_tb = sys.exc_info()
                 # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                 # logging.info(exc_type, fname, exc_tb.tb_lineno)
                 # traceback.logging.info_exc()
+                pass
         self.finished.emit()
+        
+class StdOutTextEdit(QPlainTextEdit):
+    def __init__(self, parent):
+        super(StdOutTextEdit, self).__init__()
+        self.setParent(parent)
+        self.setReadOnly(True)
+        # self.setLineWidth(50)
+        self.setMinimumSize(700,300)
+        # self.setFont(QFont('Consolas', 11))
+
+    @pyqtSlot(str)
+    def append_text(self, text: str):
+        self.moveCursor(QTextCursor.End)
+        self.insertPlainText(text)
+
+
+class StdTQDMTextEdit(QLineEdit):
+    def __init__(self, parent):
+        super(StdTQDMTextEdit, self).__init__()
+        self.setParent(parent)
+        self.setReadOnly(True)
+        self.setEnabled(True)
+        self.setMinimumWidth(500)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.setClearButtonEnabled(True)
+        self.setFont(QFont('Consolas', 11))
+
+    @pyqtSlot(str)
+    def set_tqdm_text(self, text: str):
+        new_text = text
+        if new_text.find('\r') >= 0:
+            new_text = new_text.replace('\r', '').rstrip()
+            if new_text:
+                self.setText(new_text)
+        else:
+            # we suppose that all TQDM prints have \r, so drop the rest
+            pass
+
 
 if __name__ == "__main__":
 
@@ -1393,9 +1552,21 @@ if __name__ == "__main__":
         app = QApplication(sys.argv)
     else:
         app = QApplication.instance() 
+    
+    # app = QApplication(sys.argv)
 
     window = MainWindow()
 
     window.show()
 
     app.exec()
+    
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']['queue']
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']['write_stream']
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+    del config_dict['TQDM_WRITE_STREAM_CONFIG']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['queue']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['write_stream']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+    del config_dict['STDOUT_WRITE_STREAM_CONFIG']
+    del config_dict
