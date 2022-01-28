@@ -15,8 +15,8 @@ import pandas as pd
 import shutil
 
 
-bids_dir = '/media/stluc/ColinVDB/DISSECT_MS/BIDS_R4'
-output_dir = '/media/stluc/ColinVDB/share_R4'
+bids_dir = '/media/maggi/ColinVDB/DISSECT_MS/BIDS_R4'
+output_dir = '/home/maggi/Desktop/share_R4'
 bids = BIDSHandler(bids_dir)
 sequences_to_get = [('anat','part-mag_T2starw'),
                     ('anat','FLAIR'),
@@ -67,7 +67,6 @@ for sub, sess in subject_and_sessions:
                 for file in files:
                     if f'sub-{sub}_ses-{ses}_{seq}' in file:
                         files_to_copy.append(pjoin(path, file))
-            print('files found')
             directories = [pjoin(f'sub-{sub}'), pjoin(f'sub-{sub}', f'ses-{ses}'), pjoin(f'sub-{sub}', f'ses-{ses}', f'{folder}')]
             bids.mkdirs_if_not_exist(output_dir, directories=directories)
             dest = pjoin(output_dir, f'sub-{sub}', f'ses-{ses}', f'{folder}')
